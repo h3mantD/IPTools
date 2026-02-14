@@ -16,7 +16,7 @@ use Stringable;
  *
  * @implements Iterator<int, IP>
  */
-final class Network implements Countable, Iterator, Stringable
+class Network implements Countable, Iterator, Stringable
 {
     use PropertyTrait;
 
@@ -81,14 +81,14 @@ final class Network implements Countable, Iterator, Stringable
             throw new NetworkException('Invalid prefix length');
         }
 
-        $binIP = mb_str_pad(mb_str_pad('', (int) $prefixLength, '1'), $maxPrefixLength, '0');
+        $binIP = str_pad(str_pad('', (int) $prefixLength, '1'), $maxPrefixLength, '0');
 
         return IP::parseBin($binIP);
     }
 
     public static function netmask2prefix(IP $ip): int
     {
-        return mb_strlen(mb_rtrim($ip->toBin(), '0'));
+        return strlen(rtrim($ip->toBin(), '0'));
     }
 
     /**
@@ -213,8 +213,8 @@ final class Network implements Countable, Iterator, Stringable
         $ip = $this->getIP();
 
         if ($ip->getVersion() === IP::IP_V4 && $this->getBlockSize() > 2) {
-            $firstHost = IP::parseBin(mb_substr($firstHost->toBin(), 0, $firstHost->getMaxPrefixLength() - 1).'1');
-            $lastHost = IP::parseBin(mb_substr($lastHost->toBin(), 0, $lastHost->getMaxPrefixLength() - 1).'0');
+            $firstHost = IP::parseBin(substr($firstHost->toBin(), 0, $firstHost->getMaxPrefixLength() - 1).'1');
+            $lastHost = IP::parseBin(substr($lastHost->toBin(), 0, $lastHost->getMaxPrefixLength() - 1).'0');
         }
 
         return new Range($firstHost, $lastHost);
@@ -283,7 +283,7 @@ final class Network implements Countable, Iterator, Stringable
     public function moveTo(int|string $prefixLength): array
     {
         if (! is_int($prefixLength) && ! preg_match('/^\d+$/', $prefixLength)) {
-            throw new NetworkException('Invalid prefix length ');
+            throw new NetworkException('Invalid prefix length');
         }
 
         $prefixLength = (int) $prefixLength;
@@ -291,7 +291,7 @@ final class Network implements Countable, Iterator, Stringable
         $maxPrefixLength = $ip->getMaxPrefixLength();
 
         if ($prefixLength <= $this->getPrefixLength() || $prefixLength > $maxPrefixLength) {
-            throw new NetworkException('Invalid prefix length ');
+            throw new NetworkException('Invalid prefix length');
         }
 
         $netmask = self::prefix2netmask($prefixLength, $ip->getVersion());

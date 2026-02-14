@@ -8,9 +8,9 @@ This repository is a fork of [S1lentium/IPTools](https://github.com/S1lentium/IP
 [![Coverage Status](https://coveralls.io/repos/h3mantd/IPTools/badge.svg?branch=master&service=github)](https://coveralls.io/github/h3mantd/IPTools?branch=master)
 [![Code Climate](https://codeclimate.com/github/h3mantd/IPTools/badges/gpa.svg)](https://codeclimate.com/github/h3mantd/IPTools)
 
-[![PHP 5.6](https://img.shields.io/badge/PHP-5.6-8892BF.svg)](http://php.net)
-[![PHP 7.0](https://img.shields.io/badge/PHP-7.0-8892BF.svg)](http://php.net)
-[![PHP 8.0](https://img.shields.io/badge/PHP-8.0-8892BF.svg)](http://php.net)
+[![PHP 8.2](https://img.shields.io/badge/PHP-8.2-8892BF.svg)](http://php.net)
+[![PHP 8.3](https://img.shields.io/badge/PHP-8.3-8892BF.svg)](http://php.net)
+[![PHP 8.4](https://img.shields.io/badge/PHP-8.4-8892BF.svg)](http://php.net)
 
 ## Installation
 Composer:

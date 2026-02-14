@@ -15,7 +15,7 @@ use Iterator;
  *
  * @implements Iterator<int, IP>
  */
-final class Range implements Countable, Iterator
+class Range implements Countable, Iterator
 {
     use PropertyTrait;
 
@@ -168,9 +168,9 @@ final class Range implements Countable, Iterator
 
         preg_match('/^(0*)/', $xorIP->toBin(), $match);
 
-        $prefixLength = mb_strlen($match[1]);
+        $prefixLength = strlen($match[1]);
 
-        $ip = IP::parseBin(mb_str_pad(mb_substr($firstIP->toBin(), 0, $prefixLength), $xorIP->getMaxPrefixLength(), '0'));
+        $ip = IP::parseBin(str_pad(substr($firstIP->toBin(), 0, $prefixLength), $xorIP->getMaxPrefixLength(), '0'));
 
         return new Network($ip, Network::prefix2netmask($prefixLength, $ip->getVersion()));
     }

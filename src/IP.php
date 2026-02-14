@@ -12,7 +12,7 @@ use Stringable;
  *
  * @link https://github.com/S1lentium/IPTools
  */
-final class IP implements Stringable
+class IP implements Stringable
 {
     use PropertyTrait;
 
@@ -54,13 +54,13 @@ final class IP implements Stringable
     {
         if (is_string($ip)) {
             if (str_starts_with($ip, '0x')) {
-                $ip = mb_substr($ip, 2);
+                $ip = substr($ip, 2);
 
                 return self::parseHex($ip);
             }
 
             if (str_starts_with($ip, '0b')) {
-                $ip = mb_substr($ip, 2);
+                $ip = substr($ip, 2);
 
                 return self::parseBin($ip);
             }
@@ -83,7 +83,7 @@ final class IP implements Stringable
         }
 
         $in_addr = '';
-        foreach (array_map('bindec', mb_str_split($binIP, 8)) as $char) {
+        foreach (array_map('bindec', str_split($binIP, 8)) as $char) {
             $in_addr .= pack('C*', $char);
         }
 
@@ -188,7 +188,7 @@ final class IP implements Stringable
             throw new IpException('Unable to unpack IP address');
         }
         /** @var array{hex: string} $unpacked */
-        $reverseOctets = array_reverse(mb_str_split($unpacked['hex']));
+        $reverseOctets = array_reverse(str_split($unpacked['hex']));
 
         return implode('.', $reverseOctets).'.ip6.arpa';
     }
@@ -207,7 +207,7 @@ final class IP implements Stringable
         }
         /** @var array<int, int> $unpacked */
         foreach ($unpacked as $char) {
-            $binary[] = mb_str_pad(decbin($char), 8, '0', STR_PAD_LEFT);
+            $binary[] = str_pad(decbin($char), 8, '0', STR_PAD_LEFT);
         }
 
         return implode('', $binary);
