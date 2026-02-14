@@ -33,9 +33,8 @@ final class IP implements Stringable
     /**
      * @throws IpException
      */
-    public function __construct(string|int|float $ip)
+    public function __construct(string $ip)
     {
-        $ip = (string) $ip;
         if (! filter_var($ip, FILTER_VALIDATE_IP)) {
             throw new IpException('Invalid IP address format');
         }
@@ -147,19 +146,20 @@ final class IP implements Stringable
 
     public function getVersion(): string
     {
-        $version = '';
         $ip = inet_ntop($this->in_addr);
         if ($ip === false) {
             throw new IpException('Unable to unpack IP address');
         }
 
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $version = self::IP_V4;
-        } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $version = self::IP_V6;
+            return self::IP_V4;
         }
 
-        return $version;
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return self::IP_V6;
+        }
+
+        return '';
     }
 
     public function getMaxPrefixLength(): int
@@ -218,9 +218,11 @@ final class IP implements Stringable
         return bin2hex($this->in_addr);
     }
 
+    /**
+     * @return numeric-string
+     */
     public function toLong(): string
     {
-        $long = 0;
         if ($this->getVersion() === self::IP_V4) {
             $ip = inet_ntop($this->in_addr);
             if ($ip === false) {
@@ -230,32 +232,31 @@ final class IP implements Stringable
             if ($longValue === false) {
                 throw new IpException('Unable to convert IP address');
             }
-            $long = sprintf('%u', $longValue);
-        } else {
-            $long = '0';
-            $octet = self::IP_V6_OCTETS - 1;
-            $chars = unpack('C*', $this->in_addr);
-            if ($chars === false) {
-                throw new IpException('Unable to unpack IP address');
-            }
-            /** @var array<int, int> $chars */
-            foreach ($chars as $char) {
-                $long = bcadd($long, bcmul((string) $char, bcpow('256', (string) $octet--)));
-            }
+
+            return sprintf('%u', $longValue);
         }
 
-        return (string) $long;
+        $long = '0';
+        $octet = self::IP_V6_OCTETS - 1;
+        $chars = unpack('C*', $this->in_addr);
+        if ($chars === false) {
+            throw new IpException('Unable to unpack IP address');
+        }
+        /** @var array<int, int> $chars */
+        foreach ($chars as $char) {
+            $long = bcadd($long, bcmul((string) $char, bcpow('256', (string) $octet--)));
+        }
+
+        return $long;
     }
 
     /**
-     * @param  int  $to
-     *
      * @throws IpException
      */
-    public function next($to = 1): self
+    public function next(int $to = 1): self
     {
         if ($to < 0) {
-            throw new IpException('Number must be greater than 0');
+            throw new IpException('Number must be non-negative');
         }
 
         $unpacked = unpack('C*', $this->in_addr);
@@ -283,15 +284,12 @@ final class IP implements Stringable
     }
 
     /**
-     * @param  int  $to
-     *
      * @throws IpException
      */
-    public function prev($to = 1): self
+    public function prev(int $to = 1): self
     {
-
         if ($to < 0) {
-            throw new IpException('Number must be greater than 0');
+            throw new IpException('Number must be non-negative');
         }
 
         $unpacked = unpack('C*', $this->in_addr);

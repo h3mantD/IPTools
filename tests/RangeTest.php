@@ -46,6 +46,7 @@ final class RangeTest extends TestCase
      */
     public function test_range_iteration(string $data, array $expected): void
     {
+        $result = [];
         foreach (Range::parse($data) as $ip) {
             $result[] = (string) $ip;
         }

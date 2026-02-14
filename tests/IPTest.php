@@ -29,12 +29,19 @@ final class IPTest extends TestCase
     /**
      * @dataProvider getTestConstructorExceptionData
      */
-    public function test_constructor_exception(string|float $string): void
+    public function test_constructor_exception(string $string): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Invalid IP address format');
 
         new IP($string);
+    }
+
+    public function test_constructor_rejects_non_string_types(): void
+    {
+        $this->expectException(TypeError::class);
+
+        new IP(123.45); // @phpstan-ignore argument.type
     }
 
     public function test_properties(): void
@@ -160,7 +167,7 @@ final class IPTest extends TestCase
         $object = new IP('192.168.1.1');
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Number must be greater than 0');
+        $this->expectExceptionMessage('Number must be non-negative');
 
         $object->prev(-1);
     }
@@ -180,8 +187,6 @@ final class IPTest extends TestCase
         return [
             ['256.0.0.1'],
             ['127.-1.0.1'],
-            [123.45],
-            [-123.45],
             ['cake'],
             ['12345'],
             ['-12345'],

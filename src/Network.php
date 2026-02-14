@@ -119,13 +119,10 @@ final class Network implements Countable, Iterator, Stringable
         $this->netmask = $ip;
     }
 
-    /**
-     * @param  int  $prefixLength
-     */
-    public function setPrefixLength($prefixLength): void
+    public function setPrefixLength(int $prefixLength): void
     {
         $ip = $this->getIP();
-        $this->setNetmask(self::prefix2netmask((int) $prefixLength, $ip->getVersion()));
+        $this->setNetmask(self::prefix2netmask($prefixLength, $ip->getVersion()));
     }
 
     public function getIP(): IP
@@ -224,12 +221,11 @@ final class Network implements Countable, Iterator, Stringable
     }
 
     /**
-     * @param  IP|Network  $exclude
      * @return Network[]
      *
      * @throws NetworkException
      */
-    public function exclude($exclude): array
+    public function exclude(string|IP|self $exclude): array
     {
         $exclude = self::parse($exclude);
         $ip = $this->getIP();
@@ -280,13 +276,17 @@ final class Network implements Countable, Iterator, Stringable
     }
 
     /**
-     * @param  int  $prefixLength
      * @return Network[]
      *
      * @throws NetworkException
      */
-    public function moveTo($prefixLength): array
+    public function moveTo(int|string $prefixLength): array
     {
+        if (! is_int($prefixLength) && ! preg_match('/^\d+$/', $prefixLength)) {
+            throw new NetworkException('Invalid prefix length ');
+        }
+
+        $prefixLength = (int) $prefixLength;
         $ip = $this->getIP();
         $maxPrefixLength = $ip->getMaxPrefixLength();
 

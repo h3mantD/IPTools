@@ -78,7 +78,7 @@ final class Range implements Countable, Iterator
     public function setFirstIP(IP $ip): void
     {
         if ($this->lastIP !== null && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
-            throw new RangeException('First IP is grater than second');
+            throw new RangeException('First IP is greater than second');
         }
 
         $this->firstIP = $ip;
@@ -202,11 +202,9 @@ final class Range implements Countable, Iterator
 
     public function count(): int
     {
-        $lastLong = (string) $this->getLastIP()->toLong();
-        $firstLong = (string) $this->getFirstIP()->toLong();
+        $lastLong = $this->getLastIP()->toLong();
+        $firstLong = $this->getFirstIP()->toLong();
 
-        /** @var numeric-string $lastLong */
-        /** @var numeric-string $firstLong */
         return max(0, (int) bcadd(bcsub($lastLong, $firstLong), '1'));
     }
 }

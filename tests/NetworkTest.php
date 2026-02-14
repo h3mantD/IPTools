@@ -274,6 +274,7 @@ final class NetworkTest extends TestCase
             ['192.168.0.0/22', '21'],
             ['192.168.0.0/22', '33'],
             ['192.168.0.0/22', 'prefixLength'],
+            ['192.168.0.0/22', '24abc'],
         ];
     }
 
