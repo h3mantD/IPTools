@@ -62,6 +62,14 @@ final class RangeTest extends TestCase
         $this->assertEquals($expected, count(Range::parse($data)));
     }
 
+    public function test_constructor_rejects_mixed_ip_versions(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Last IP version does not match first IP version');
+
+        new Range(IP::parse('127.0.0.1'), IP::parse('2001:db8::1'));
+    }
+
     public function getTestParseData(): array
     {
         return [

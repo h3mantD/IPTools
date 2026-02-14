@@ -75,6 +75,10 @@ class Range implements Countable, Iterator
      */
     public function setFirstIP(IP $ip): void
     {
+        if ($this->lastIP instanceof IP && $ip->getVersion() !== $this->lastIP->getVersion()) {
+            throw new RangeException('First IP version does not match last IP version');
+        }
+
         if ($this->lastIP instanceof IP && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
             throw new RangeException('First IP is greater than second');
         }
@@ -87,6 +91,10 @@ class Range implements Countable, Iterator
      */
     public function setLastIP(IP $ip): void
     {
+        if ($this->firstIP instanceof IP && $ip->getVersion() !== $this->firstIP->getVersion()) {
+            throw new RangeException('Last IP version does not match first IP version');
+        }
+
         if ($this->firstIP instanceof IP && strcmp($ip->inAddr(), $this->firstIP->inAddr()) < 0) {
             throw new RangeException('Last IP is less than first');
         }
