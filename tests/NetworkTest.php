@@ -86,7 +86,7 @@ final class NetworkTest extends TestCase
     {
         $result = [];
 
-        foreach (Network::parse($data)->getHosts as $ip) {
+        foreach (Network::parse($data)->hosts as $ip) {
             $result[] = (string) $ip;
         }
 

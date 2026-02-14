@@ -25,6 +25,8 @@ class Range implements Countable, Iterator
 
     private int $position = 0;
 
+    private ?IP $currentIP = null;
+
     /**
      * @throws RangeException
      */
@@ -60,16 +62,12 @@ class Range implements Countable, Iterator
         $firstIP = $this->getFirstIP();
         $lastIP = $this->getLastIP();
         if ($find instanceof IP) {
-            $within = (strcmp($find->inAddr(), $firstIP->inAddr()) >= 0)
+            return (strcmp($find->inAddr(), $firstIP->inAddr()) >= 0)
                 && (strcmp($find->inAddr(), $lastIP->inAddr()) <= 0);
-
-            return $within;
         }
 
-        $within = (strcmp($find->getFirstIP()->inAddr(), $firstIP->inAddr()) >= 0)
+        return (strcmp($find->getFirstIP()->inAddr(), $firstIP->inAddr()) >= 0)
             && (strcmp($find->getLastIP()->inAddr(), $lastIP->inAddr()) <= 0);
-
-        return $within;
     }
 
     /**
@@ -77,7 +75,7 @@ class Range implements Countable, Iterator
      */
     public function setFirstIP(IP $ip): void
     {
-        if ($this->lastIP !== null && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
+        if ($this->lastIP instanceof \IPTools\IP && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
             throw new RangeException('First IP is greater than second');
         }
 
@@ -89,7 +87,7 @@ class Range implements Countable, Iterator
      */
     public function setLastIP(IP $ip): void
     {
-        if ($this->firstIP !== null && strcmp($ip->inAddr(), $this->firstIP->inAddr()) < 0) {
+        if ($this->firstIP instanceof \IPTools\IP && strcmp($ip->inAddr(), $this->firstIP->inAddr()) < 0) {
             throw new RangeException('Last IP is less than first');
         }
 
@@ -98,7 +96,7 @@ class Range implements Countable, Iterator
 
     public function getFirstIP(): IP
     {
-        if ($this->firstIP === null) {
+        if (!$this->firstIP instanceof \IPTools\IP) {
             throw new RangeException('First IP is not set');
         }
 
@@ -107,7 +105,7 @@ class Range implements Countable, Iterator
 
     public function getLastIP(): IP
     {
-        if ($this->lastIP === null) {
+        if (!$this->lastIP instanceof \IPTools\IP) {
             throw new RangeException('Last IP is not set');
         }
 
@@ -177,7 +175,11 @@ class Range implements Countable, Iterator
 
     public function current(): IP
     {
-        return $this->getFirstIP()->next($this->position);
+        if (!$this->currentIP instanceof \IPTools\IP) {
+            $this->currentIP = $this->getFirstIP()->next($this->position);
+        }
+
+        return $this->currentIP;
     }
 
     public function key(): int
@@ -188,18 +190,27 @@ class Range implements Countable, Iterator
     public function next(): void
     {
         $this->position++;
+
+        if ($this->currentIP instanceof \IPTools\IP) {
+            $this->currentIP = $this->currentIP->next();
+        }
     }
 
     public function rewind(): void
     {
         $this->position = 0;
+        $this->currentIP = null;
     }
 
     public function valid(): bool
     {
-        return strcmp($this->getFirstIP()->next($this->position)->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+        return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 
+    /**
+     * Note: Countable requires int; very large IPv6 ranges may exceed PHP_INT_MAX.
+     * For precise large-range sizes, compare getFirstIP()/getLastIP() or use BCMath externally.
+     */
     public function count(): int
     {
         $lastLong = $this->getLastIP()->toLong();

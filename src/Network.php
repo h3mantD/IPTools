@@ -26,6 +26,8 @@ class Network implements Countable, Iterator, Stringable
 
     private int $position = 0;
 
+    private ?IP $currentIP = null;
+
     public function __construct(IP $ip, IP $netmask)
     {
         $this->setIP($ip);
@@ -96,7 +98,7 @@ class Network implements Countable, Iterator, Stringable
      */
     public function setIP(IP $ip): void
     {
-        if ($this->netmask !== null && $this->netmask->getVersion() !== $ip->getVersion()) {
+        if ($this->netmask instanceof \IPTools\IP && $this->netmask->getVersion() !== $ip->getVersion()) {
             throw new NetworkException('IP version is not same as Netmask version');
         }
 
@@ -112,7 +114,7 @@ class Network implements Countable, Iterator, Stringable
             throw new NetworkException('Invalid Netmask address format');
         }
 
-        if ($this->ip !== null && $ip->getVersion() !== $this->ip->getVersion()) {
+        if ($this->ip instanceof \IPTools\IP && $ip->getVersion() !== $this->ip->getVersion()) {
             throw new NetworkException('Netmask version is not same as IP version');
         }
 
@@ -127,7 +129,7 @@ class Network implements Countable, Iterator, Stringable
 
     public function getIP(): IP
     {
-        if ($this->ip === null) {
+        if (!$this->ip instanceof \IPTools\IP) {
             throw new NetworkException('IP address is not set');
         }
 
@@ -136,7 +138,7 @@ class Network implements Countable, Iterator, Stringable
 
     public function getNetmask(): IP
     {
-        if ($this->netmask === null) {
+        if (!$this->netmask instanceof \IPTools\IP) {
             throw new NetworkException('Netmask is not set');
         }
 
@@ -270,7 +272,7 @@ class Network implements Countable, Iterator, Stringable
             $unmatched->setIP($matched->getLastIP()->next());
         }
 
-        sort($networks);
+        usort($networks, static fn (self $a, self $b): int => strcmp($a->getFirstIP()->inAddr(), $b->getFirstIP()->inAddr()));
 
         return $networks;
     }
@@ -310,7 +312,11 @@ class Network implements Countable, Iterator, Stringable
 
     public function current(): IP
     {
-        return $this->getFirstIP()->next($this->position);
+        if (!$this->currentIP instanceof \IPTools\IP) {
+            $this->currentIP = $this->getFirstIP()->next($this->position);
+        }
+
+        return $this->currentIP;
     }
 
     public function key(): int
@@ -321,18 +327,27 @@ class Network implements Countable, Iterator, Stringable
     public function next(): void
     {
         $this->position++;
+
+        if ($this->currentIP instanceof \IPTools\IP) {
+            $this->currentIP = $this->currentIP->next();
+        }
     }
 
     public function rewind(): void
     {
         $this->position = 0;
+        $this->currentIP = null;
     }
 
     public function valid(): bool
     {
-        return strcmp($this->getFirstIP()->next($this->position)->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+        return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 
+    /**
+     * Note: Countable requires int; very large IPv6 blocks may exceed PHP_INT_MAX.
+     * Use getBlockSize() for precise big-integer size information.
+     */
     public function count(): int
     {
         return max(0, (int) $this->getBlockSize());
