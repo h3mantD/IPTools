@@ -1,16 +1,17 @@
 <?php
 
-use IPTools\Range;
-use IPTools\Network;
+declare(strict_types=1);
+
 use IPTools\IP;
+use IPTools\Range;
 use PHPUnit\Framework\TestCase;
 
-class RangeTest extends TestCase
+final class RangeTest extends TestCase
 {
     /**
      * @dataProvider getTestParseData
      */
-    public function testParse($data, $expected): void
+    public function test_parse(string $data, array $expected): void
     {
         $range = Range::parse($data);
 
@@ -21,21 +22,21 @@ class RangeTest extends TestCase
     /**
      * @dataProvider getTestNetworksData
      */
-    public function testGetNetworks($data, $expected): void
+    public function test_get_networks(string $data, array $expected): void
     {
-        $result = array();
+        $result = [];
 
         foreach (Range::parse($data)->getNetworks() as $network) {
-            $result[] = (string)$network;
+            $result[] = (string) $network;
         }
 
-        $this->assertEquals($expected, $result);        
+        $this->assertEquals($expected, $result);
     }
 
     /**
      * @dataProvider getTestContainsData
      */
-    public function testContains($data, $find, $expected): void
+    public function test_contains(string $data, string $find, bool $expected): void
     {
         $this->assertEquals($expected, Range::parse($data)->contains(new IP($find)));
     }
@@ -43,10 +44,10 @@ class RangeTest extends TestCase
     /**
      * @dataProvider getTestIterationData
      */
-    public function testRangeIteration($data, $expected): void
+    public function test_range_iteration(string $data, array $expected): void
     {
-        foreach (Range::parse($data) as $key => $ip) {
-           $result[] = (string)$ip;
+        foreach (Range::parse($data) as $ip) {
+            $result[] = (string) $ip;
         }
 
         $this->assertEquals($expected, $result);
@@ -55,7 +56,7 @@ class RangeTest extends TestCase
     /**
      * @dataProvider getTestCountData
      */
-    public function testCount($data, $expected): void
+    public function test_count(string $data, int $expected): void
     {
         $this->assertEquals($expected, count(Range::parse($data)));
     }
@@ -76,21 +77,21 @@ class RangeTest extends TestCase
             ['192.168.1.*', ['192.168.1.0/24']],
             [
                 '192.168.1.208-192.168.1.255', [
-                '192.168.1.208/28',
-                '192.168.1.224/27'
-            ]
+                    '192.168.1.208/28',
+                    '192.168.1.224/27',
+                ],
             ],
             [
                 '192.168.1.0-192.168.1.191', [
-                '192.168.1.0/25',
-                '192.168.1.128/26'
-            ]
+                    '192.168.1.0/25',
+                    '192.168.1.128/26',
+                ],
             ],
             [
                 '192.168.1.125-192.168.1.126', [
-                '192.168.1.125/32',
-                '192.168.1.126/32',
-            ]
+                    '192.168.1.125/32',
+                    '192.168.1.126/32',
+                ],
             ],
         ];
     }
@@ -102,7 +103,7 @@ class RangeTest extends TestCase
             ['192.168.*.*', '192.169.255.255', false],
 
             /**
-             * 10.10.45.48 --> 00001010 00001010 00101101 00110000 
+             * 10.10.45.48 --> 00001010 00001010 00101101 00110000
              * the last 0000 leads error
              */
             ['10.10.45.48/28', '10.10.45.58', true],
@@ -126,7 +127,7 @@ class RangeTest extends TestCase
                     '192.168.2.5',
                     '192.168.2.6',
                     '192.168.2.7',
-                ]
+                ],
             ],
             [
                 '2001:db8::/125',
@@ -139,7 +140,7 @@ class RangeTest extends TestCase
                     '2001:db8::5',
                     '2001:db8::6',
                     '2001:db8::7',
-                ]
+                ],
             ],
         ];
     }
@@ -151,5 +152,4 @@ class RangeTest extends TestCase
             ['2001:db8::/120', 256],
         ];
     }
-
 }

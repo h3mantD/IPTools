@@ -31,3 +31,4 @@ phpunit.xml.dist
 
 composer.phar
 composer.lock
+plan.md

@@ -1,243 +1,212 @@
 <?php
+
+declare(strict_types=1);
+
 namespace IPTools;
 
+use Countable;
 use IPTools\Exception\RangeException;
-use ReturnTypeWillChange;
+use Iterator;
 
 /**
  * @author Safarov Alisher <alisher.safarov@outlook.com>
+ *
  * @link https://github.com/S1lentium/IPTools
+ *
+ * @implements Iterator<int, IP>
  */
-class Range implements \Iterator, \Countable
+final class Range implements Countable, Iterator
 {
-	use PropertyTrait;
+    use PropertyTrait;
 
-	/**
-	 * @var IP
-	 */
-	private $firstIP;
-	/**
-	 * @var IP
-	 */
-	private $lastIP;
-	/**
-	 * @var int
-	 */
-	private $position = 0;
+    private ?IP $firstIP = null;
 
-	/**
-	 * @param IP $firstIP
-	 * @param IP $lastIP
-	 * @throws RangeException
-	 */
-	public function __construct(IP $firstIP, IP $lastIP)
-	{
-		$this->setFirstIP($firstIP);
-		$this->setLastIP($lastIP);
-	}
+    private ?IP $lastIP = null;
 
-	/**
-	 * @param string $data
-	 * @return Range
-	 */
-	public static function parse($data)
-	{
-		if (strpos($data,'/') || strpos($data,' ')) {
-			$network = Network::parse($data);
-			$firstIP = $network->getFirstIP();
-			$lastIP  = $network->getLastIP();
-		} elseif (strpos($data, '*') !== false) {
-			$firstIP = IP::parse(str_replace('*', '0', $data));
-			$lastIP  = IP::parse(str_replace('*', '255', $data));
-		} elseif (strpos($data, '-')) {
-			list($first, $last) = explode('-', $data, 2);
-			$firstIP = IP::parse($first);
-			$lastIP  = IP::parse($last);
-		} else {
-			$firstIP = IP::parse($data);
-			$lastIP  = clone $firstIP;
-		}
-
-		return new self($firstIP, $lastIP);
-	}
-
-	/**
-	 * @param IP|Network|Range $find
-	 * @return bool
-	 * @throws RangeException
-	 */
-	public function contains($find)
-	{
-		if ($find instanceof IP) {
-			$within = (strcmp($find->inAddr(), $this->firstIP->inAddr()) >= 0)
-				&& (strcmp($find->inAddr(), $this->lastIP->inAddr()) <= 0);
-		} elseif ($find instanceof Range || $find instanceof Network) {
-			/**
-			 * @var Network|Range $find
-			 */
-			$within = (strcmp($find->getFirstIP()->inAddr(), $this->firstIP->inAddr()) >= 0)
-				&& (strcmp($find->getLastIP()->inAddr(), $this->lastIP->inAddr()) <= 0);
-		} else {
-			throw new RangeException('Invalid type');
-		}
-
-		return $within;
-	}
-
-	/**
-	 * @param IP $ip
-	 * @throws RangeException
-	 */
-	public function setFirstIP(IP $ip)
-	{
-		if ($this->lastIP && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
-			throw new RangeException('First IP is grater than second');
-		}
-
-		$this->firstIP = $ip;
-	}
-
-	/**
-	 * @param IP $ip
-	 * @throws RangeException
-	 */
-	public function setLastIP(IP $ip)
-	{
-		if ($this->firstIP && strcmp($ip->inAddr(), $this->firstIP->inAddr()) < 0) {
-			throw new RangeException('Last IP is less than first');
-		}
-
-		$this->lastIP = $ip;
-	}
-
-	/**
-	 * @return IP
-	 */
-	public function getFirstIP()
-	{
-		return $this->firstIP;
-	}
-
-	/**
-	 * @return IP
-	 */
-	public function getLastIP()
-	{
-		return $this->lastIP;
-	}
-
-	/**
-	 * @return Network[]
-	 */
-	public function getNetworks()
-	{
-		$span = $this->getSpanNetwork();
-
-		$networks = array();
-
-		if ($span->getFirstIP()->inAddr() === $this->firstIP->inAddr()
-			&& $span->getLastIP()->inAddr() === $this->lastIP->inAddr()
-		) {
-			$networks = array($span);
-		} else {
-			if ($span->getFirstIP()->inAddr() !== $this->firstIP->inAddr()) {
-				$excluded = $span->exclude($this->firstIP->prev());
-				foreach ($excluded as $network) {
-					if (strcmp($network->getFirstIP()->inAddr(), $this->firstIP->inAddr()) >= 0) {
-						$networks[] = $network;
-					}
-				}
-			}
-
-			if ($span->getLastIP()->inAddr() !== $this->lastIP->inAddr()) {
-				if (!$networks) {
-					$excluded = $span->exclude($this->lastIP->next());
-				} else {
-					$excluded = array_pop($networks);
-					$excluded = $excluded->exclude($this->lastIP->next());
-				}
-
-				foreach ($excluded as $network) {
-					$networks[] = $network;
-					if ($network->getLastIP()->inAddr() === $this->lastIP->inAddr()) {
-						break;
-					}
-				}
-			}
-
-		}
-
-		return $networks;
-	}
-
-	/**
-	 * @return Network
-	 */
-	public function getSpanNetwork()
-	{
-		$xorIP = IP::parseInAddr($this->getFirstIP()->inAddr() ^ $this->getLastIP()->inAddr());
-
-		preg_match('/^(0*)/', $xorIP->toBin(), $match);
-
-		$prefixLength = strlen($match[1]);
-
-		$ip = IP::parseBin(str_pad(substr($this->getFirstIP()->toBin(), 0, $prefixLength), $xorIP->getMaxPrefixLength(), '0'));
-
-		return new Network($ip, Network::prefix2netmask($prefixLength, $ip->getVersion()));
-	}
-
-	/**
-	 * @return IP
-	 */
-	#[ReturnTypeWillChange]
-	public function current()
-	{
-		return $this->firstIP->next($this->position);
-	}
-
-	/**
-	 * @return int
-	 */
-	#[ReturnTypeWillChange]
-	public function key()
-	{
-		return $this->position;
-	}
+    private int $position = 0;
 
     /**
-     * @return void
+     * @throws RangeException
      */
-	#[ReturnTypeWillChange]
-	public function next()
-	{
-		++$this->position;
-	}
+    public function __construct(IP $firstIP, IP $lastIP)
+    {
+        $this->setFirstIP($firstIP);
+        $this->setLastIP($lastIP);
+    }
+
+    public static function parse(string $data): self
+    {
+        if (str_contains($data, '/') || str_contains($data, ' ')) {
+            $network = Network::parse($data);
+            $firstIP = $network->getFirstIP();
+            $lastIP = $network->getLastIP();
+        } elseif (str_contains($data, '*')) {
+            $firstIP = IP::parse(str_replace('*', '0', $data));
+            $lastIP = IP::parse(str_replace('*', '255', $data));
+        } elseif (str_contains($data, '-')) {
+            [$first, $last] = explode('-', $data, 2);
+            $firstIP = IP::parse($first);
+            $lastIP = IP::parse($last);
+        } else {
+            $firstIP = IP::parse($data);
+            $lastIP = clone $firstIP;
+        }
+
+        return new self($firstIP, $lastIP);
+    }
+
+    public function contains(IP|Network|self $find): bool
+    {
+        $firstIP = $this->getFirstIP();
+        $lastIP = $this->getLastIP();
+        if ($find instanceof IP) {
+            $within = (strcmp($find->inAddr(), $firstIP->inAddr()) >= 0)
+                && (strcmp($find->inAddr(), $lastIP->inAddr()) <= 0);
+
+            return $within;
+        }
+
+        $within = (strcmp($find->getFirstIP()->inAddr(), $firstIP->inAddr()) >= 0)
+            && (strcmp($find->getLastIP()->inAddr(), $lastIP->inAddr()) <= 0);
+
+        return $within;
+    }
 
     /**
-     * @return void
+     * @throws RangeException
      */
-	#[ReturnTypeWillChange]
-	public function rewind()
-	{
-		$this->position = 0;
-	}
+    public function setFirstIP(IP $ip): void
+    {
+        if ($this->lastIP !== null && strcmp($ip->inAddr(), $this->lastIP->inAddr()) > 0) {
+            throw new RangeException('First IP is grater than second');
+        }
 
-	/**
-	 * @return bool
-	 */
-	#[ReturnTypeWillChange]
-	public function valid()
-	{
-		return strcmp($this->firstIP->next($this->position)->inAddr(), $this->lastIP->inAddr()) <= 0;
-	}
+        $this->firstIP = $ip;
+    }
 
-	/**
-	 * @return int
-	 */
-	#[ReturnTypeWillChange]
-	public function count()
-	{
-		return (integer)bcadd(bcsub($this->lastIP->toLong(), $this->firstIP->toLong()), 1);
-	}
+    /**
+     * @throws RangeException
+     */
+    public function setLastIP(IP $ip): void
+    {
+        if ($this->firstIP !== null && strcmp($ip->inAddr(), $this->firstIP->inAddr()) < 0) {
+            throw new RangeException('Last IP is less than first');
+        }
 
+        $this->lastIP = $ip;
+    }
+
+    public function getFirstIP(): IP
+    {
+        if ($this->firstIP === null) {
+            throw new RangeException('First IP is not set');
+        }
+
+        return $this->firstIP;
+    }
+
+    public function getLastIP(): IP
+    {
+        if ($this->lastIP === null) {
+            throw new RangeException('Last IP is not set');
+        }
+
+        return $this->lastIP;
+    }
+
+    /**
+     * @return Network[]
+     */
+    public function getNetworks(): array
+    {
+        $span = $this->getSpanNetwork();
+        $firstIP = $this->getFirstIP();
+        $lastIP = $this->getLastIP();
+
+        $networks = [];
+
+        if ($span->getFirstIP()->inAddr() === $firstIP->inAddr()
+            && $span->getLastIP()->inAddr() === $lastIP->inAddr()
+        ) {
+            $networks = [$span];
+        } else {
+            if ($span->getFirstIP()->inAddr() !== $firstIP->inAddr()) {
+                $excluded = $span->exclude($firstIP->prev());
+                foreach ($excluded as $network) {
+                    if (strcmp($network->getFirstIP()->inAddr(), $firstIP->inAddr()) >= 0) {
+                        $networks[] = $network;
+                    }
+                }
+            }
+
+            if ($span->getLastIP()->inAddr() !== $lastIP->inAddr()) {
+                if ($networks === []) {
+                    $excluded = $span->exclude($lastIP->next());
+                } else {
+                    $excluded = array_pop($networks);
+                    $excluded = $excluded->exclude($lastIP->next());
+                }
+
+                foreach ($excluded as $network) {
+                    $networks[] = $network;
+                    if ($network->getLastIP()->inAddr() === $lastIP->inAddr()) {
+                        break;
+                    }
+                }
+            }
+
+        }
+
+        return $networks;
+    }
+
+    public function getSpanNetwork(): Network
+    {
+        $firstIP = $this->getFirstIP();
+        $lastIP = $this->getLastIP();
+        $xorIP = IP::parseInAddr($firstIP->inAddr() ^ $lastIP->inAddr());
+
+        preg_match('/^(0*)/', $xorIP->toBin(), $match);
+
+        $prefixLength = mb_strlen($match[1]);
+
+        $ip = IP::parseBin(mb_str_pad(mb_substr($firstIP->toBin(), 0, $prefixLength), $xorIP->getMaxPrefixLength(), '0'));
+
+        return new Network($ip, Network::prefix2netmask($prefixLength, $ip->getVersion()));
+    }
+
+    public function current(): IP
+    {
+        return $this->getFirstIP()->next($this->position);
+    }
+
+    public function key(): int
+    {
+        return $this->position;
+    }
+
+    public function next(): void
+    {
+        $this->position++;
+    }
+
+    public function rewind(): void
+    {
+        $this->position = 0;
+    }
+
+    public function valid(): bool
+    {
+        return strcmp($this->getFirstIP()->next($this->position)->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+    }
+
+    public function count(): int
+    {
+        $lastLong = (string) $this->getLastIP()->toLong();
+        $firstLong = (string) $this->getFirstIP()->toLong();
+
+        /** @var numeric-string $lastLong */
+        /** @var numeric-string $firstLong */
+        return max(0, (int) bcadd(bcsub($lastLong, $firstLong), '1'));
+    }
 }

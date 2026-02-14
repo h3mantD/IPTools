@@ -1,5 +1,5 @@
 {
-    "name": "s1lentium/iptools",
+    "name": "h3mantd/iptools",
     "type": "library",
     "description": "PHP Library for manipulating network addresses (IPv4 and IPv6)",
     "keywords": ["IP-Tools", "network", "subnet", "cidr", "IP", "IPv4", "IPv6"],
@@ -15,7 +15,10 @@
     },
     "require-dev": {
         "php-coveralls/php-coveralls": "^2.5",
-        "phpunit/phpunit": "^9.0"
+        "phpunit/phpunit": "^9.0",
+        "laravel/pint": "^1.27",
+        "rector/rector": "^2.3",
+        "phpstan/phpstan": "^2.1"
     },
     "autoload": {
         "psr-4": {

@@ -2,9 +2,9 @@
 
 PHP Library for manipulating network addresses (IPv4 and IPv6).
 
-[![Build Status](https://travis-ci.org/S1lentium/IPTools.svg)](https://travis-ci.org/S1lentium/IPTools)
-[![Coverage Status](https://coveralls.io/repos/S1lentium/IPTools/badge.svg?branch=master&service=github)](https://coveralls.io/github/S1lentium/IPTools?branch=master)
-[![Code Climate](https://codeclimate.com/github/S1lentium/IPTools/badges/gpa.svg)](https://codeclimate.com/github/S1lentium/IPTools)
+[![Build Status](https://travis-ci.org/h3mantd/IPTools.svg)](https://travis-ci.org/h3mantd/IPTools)
+[![Coverage Status](https://coveralls.io/repos/h3mantd/IPTools/badge.svg?branch=master&service=github)](https://coveralls.io/github/h3mantd/IPTools?branch=master)
+[![Code Climate](https://codeclimate.com/github/h3mantd/IPTools/badges/gpa.svg)](https://codeclimate.com/github/h3mantd/IPTools)
 
 [![PHP 5.6](https://img.shields.io/badge/PHP-5.6-8892BF.svg)](http://php.net)
 [![PHP 7.0](https://img.shields.io/badge/PHP-7.0-8892BF.svg)](http://php.net)
@@ -14,13 +14,13 @@ PHP Library for manipulating network addresses (IPv4 and IPv6).
 Composer:
 Run in command line:
 ```
-composer require s1lentium/iptools
+composer require h3mantd/iptools
 ```
 or put in composer.json:
 ```json
 {
     "require": {
-        "s1lentium/iptools": "*"
+        "h3mantd/iptools": "*"
     }
 }
 ```
