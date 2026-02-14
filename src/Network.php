@@ -98,7 +98,7 @@ class Network implements Countable, Iterator, Stringable
      */
     public function setIP(IP $ip): void
     {
-        if ($this->netmask instanceof \IPTools\IP && $this->netmask->getVersion() !== $ip->getVersion()) {
+        if ($this->netmask instanceof IP && $this->netmask->getVersion() !== $ip->getVersion()) {
             throw new NetworkException('IP version is not same as Netmask version');
         }
 
@@ -114,7 +114,7 @@ class Network implements Countable, Iterator, Stringable
             throw new NetworkException('Invalid Netmask address format');
         }
 
-        if ($this->ip instanceof \IPTools\IP && $ip->getVersion() !== $this->ip->getVersion()) {
+        if ($this->ip instanceof IP && $ip->getVersion() !== $this->ip->getVersion()) {
             throw new NetworkException('Netmask version is not same as IP version');
         }
 
@@ -129,7 +129,7 @@ class Network implements Countable, Iterator, Stringable
 
     public function getIP(): IP
     {
-        if (!$this->ip instanceof \IPTools\IP) {
+        if (! $this->ip instanceof IP) {
             throw new NetworkException('IP address is not set');
         }
 
@@ -138,7 +138,7 @@ class Network implements Countable, Iterator, Stringable
 
     public function getNetmask(): IP
     {
-        if (!$this->netmask instanceof \IPTools\IP) {
+        if (! $this->netmask instanceof IP) {
             throw new NetworkException('Netmask is not set');
         }
 
@@ -312,7 +312,7 @@ class Network implements Countable, Iterator, Stringable
 
     public function current(): IP
     {
-        if (!$this->currentIP instanceof \IPTools\IP) {
+        if (! $this->currentIP instanceof IP) {
             $this->currentIP = $this->getFirstIP()->next($this->position);
         }
 
@@ -328,7 +328,7 @@ class Network implements Countable, Iterator, Stringable
     {
         $this->position++;
 
-        if ($this->currentIP instanceof \IPTools\IP) {
+        if ($this->currentIP instanceof IP) {
             $this->currentIP = $this->currentIP->next();
         }
     }
