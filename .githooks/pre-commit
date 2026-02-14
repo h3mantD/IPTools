@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ ! -x "./vendor/bin/pint" ] || [ ! -x "./vendor/bin/phpstan" ] || [ ! -x "./vendor/bin/rector" ] || [ ! -x "./vendor/bin/phpunit" ]; then
+    echo "pre-commit: one or more tools are missing. Run 'composer install'."
+    exit 1
+fi
+
+echo "pre-commit: running Pint style check..."
+./vendor/bin/pint --test
+
+echo "pre-commit: running PHPStan..."
+./vendor/bin/phpstan analyse -c phpstan.neon.dist
+
+echo "pre-commit: running Rector dry run..."
+./vendor/bin/rector process --dry-run
+
+echo "pre-commit: running PHPUnit..."
+./vendor/bin/phpunit --do-not-fail-on-warning --do-not-fail-on-phpunit-warning
