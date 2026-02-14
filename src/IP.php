@@ -159,7 +159,7 @@ class IP implements Stringable
             return self::IP_V6;
         }
 
-        return '';
+        throw new IpException('Unable to determine IP version');
     }
 
     public function getMaxPrefixLength(): int
@@ -252,6 +252,9 @@ class IP implements Stringable
 
     /**
      * @throws IpException
+     *
+     * Note: this method wraps at the address-space boundary.
+     * Example: 255.255.255.255 -> 0.0.0.0
      */
     public function next(int $to = 1): self
     {
@@ -285,6 +288,9 @@ class IP implements Stringable
 
     /**
      * @throws IpException
+     *
+     * Note: this method wraps at the address-space boundary.
+     * Example: 0.0.0.0 -> 255.255.255.255
      */
     public function prev(int $to = 1): self
     {

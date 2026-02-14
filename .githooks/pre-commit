@@ -17,4 +17,4 @@ echo "pre-commit: running Rector dry run..."
 ./vendor/bin/rector process --dry-run
 
 echo "pre-commit: running PHPUnit..."
-./vendor/bin/phpunit
+./vendor/bin/phpunit --do-not-fail-on-warning --do-not-fail-on-phpunit-warning

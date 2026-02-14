@@ -5,7 +5,6 @@ PHP Library for manipulating network addresses (IPv4 and IPv6).
 This repository is a fork of [S1lentium/IPTools](https://github.com/S1lentium/IPTools).
 
 [![Build Status](https://app.travis-ci.com/h3mantD/IPTools.svg?branch=master)](https://app.travis-ci.com/github/h3mantD/IPTools)
-[![Coverage Status](https://coveralls.io/repos/h3mantd/IPTools/badge.svg?branch=master&service=github)](https://coveralls.io/github/h3mantd/IPTools?branch=master)
 [![Code Climate](https://codeclimate.com/github/h3mantd/IPTools/badges/gpa.svg)](https://codeclimate.com/github/h3mantd/IPTools)
 
 [![PHP 8.2](https://img.shields.io/badge/PHP-8.2-8892BF.svg)](http://php.net)
@@ -71,8 +70,8 @@ The count of octets in IP address: 4 for IPv4, 16 for IPv6
 `reversePointer`
 The name of the reverse DNS PTR for the address:
 ```php
-echo new IP::parse('192.0.2.5')->reversePointer // 5.2.0.192.in-addr.arpa
-echo new IP::parse('2001:db8::567:89ab')->reversePointer // b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa
+echo IP::parse('192.0.2.5')->reversePointer; // 5.2.0.192.in-addr.arpa
+echo IP::parse('2001:db8::567:89ab')->reversePointer; // b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa
 ```
 
 ### Network Operations

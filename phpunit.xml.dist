@@ -1,30 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
-         colors="true"
-         executionOrder="depends,defects"
-         backupGlobals="false"
-         beStrictAboutOutputDuringTests="true"
-         beStrictAboutTodoAnnotatedTests="true"
-         verbose="true">
-
-    <php>
-        <ini name="error_reporting" value="-1"/>
-    </php>
-
-    <coverage processUncoveredFiles="true">
-        <include>
-            <directory suffix=".php">src</directory>
-        </include>
-        <report>
-            <html outputDirectory="tests/var/coverage-report" lowUpperBound="35" highLowerBound="70"/>
-            <text outputFile="php://stdout" showOnlySummary="true"/>
-        </report>
-    </coverage>
-
-    <testsuites>
-        <testsuite name="default">
-            <directory>tests</directory>
-        </testsuite>
-    </testsuites>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd" colors="true" executionOrder="depends,defects" backupGlobals="false" beStrictAboutOutputDuringTests="true" cacheDirectory=".phpunit.cache">
+  <php>
+    <ini name="error_reporting" value="-1"/>
+  </php>
+  <coverage>
+    <report>
+      <html outputDirectory="tests/var/coverage-report" lowUpperBound="35" highLowerBound="70"/>
+      <text outputFile="php://stdout" showOnlySummary="true"/>
+    </report>
+  </coverage>
+  <testsuites>
+    <testsuite name="default">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <source>
+    <include>
+      <directory suffix=".php">src</directory>
+    </include>
+  </source>
 </phpunit>

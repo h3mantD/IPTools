@@ -25,6 +25,7 @@ phpunit.phar
 phpunit.xml
 phpunit.xml.dist
 .phpunit.result.cache
+.phpunit.cache/
 
 # coverage report
 /coverage

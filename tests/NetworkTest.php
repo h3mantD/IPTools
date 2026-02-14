@@ -8,6 +8,159 @@ use PHPUnit\Framework\TestCase;
 
 final class NetworkTest extends TestCase
 {
+    public static function getTestParseData(): array
+    {
+        return [
+            ['192.168.0.54/24', '192.168.0.0/24'],
+            ['2001::2001:2001/32', '2001::/32'],
+            ['127.168.0.1 255.255.255.255', '127.168.0.1/32'],
+            ['1234::1234', '1234::1234/128'],
+        ];
+    }
+
+    public static function getPrefixData(): array
+    {
+        return [
+            ['24', IP::IP_V4, IP::parse('255.255.255.0')],
+            ['32', IP::IP_V4, IP::parse('255.255.255.255')],
+            ['64', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff::')],
+            ['128', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')],
+        ];
+    }
+
+    public static function getInvalidPrefixData(): array
+    {
+        return [
+            ['-1', IP::IP_V4],
+            ['33', IP::IP_V4],
+            ['-1', IP::IP_V6],
+            ['129', IP::IP_V6],
+        ];
+    }
+
+    public static function getHostsData(): array
+    {
+        return [
+            [
+                '192.0.2.0/29',
+                [
+                    '192.0.2.1',
+                    '192.0.2.2',
+                    '192.0.2.3',
+                    '192.0.2.4',
+                    '192.0.2.5',
+                    '192.0.2.6',
+                ],
+            ],
+        ];
+    }
+
+    public static function getExcludeData(): array
+    {
+        return [
+            [
+                '192.0.2.0/28', '192.0.2.1/32',
+                [
+                    '192.0.2.0/32',
+                    '192.0.2.2/31',
+                    '192.0.2.4/30',
+                    '192.0.2.8/29',
+                ],
+            ],
+            ['192.0.2.2/32', '192.0.2.2/32', []],
+        ];
+    }
+
+    public static function getExcludeExceptionData(): array
+    {
+        return [
+            ['192.0.2.0/28', '192.0.3.0/24'],
+            ['192.0.2.2/32', '192.0.2.3/32'],
+        ];
+    }
+
+    public static function getMoveToData(): array
+    {
+        return [
+            [
+                '192.168.0.0/22', '24',
+                [
+                    '192.168.0.0/24',
+                    '192.168.1.0/24',
+                    '192.168.2.0/24',
+                    '192.168.3.0/24',
+                ],
+            ],
+            [
+                '192.168.2.0/24', '25',
+                [
+                    '192.168.2.0/25',
+                    '192.168.2.128/25',
+                ],
+            ],
+            [
+                '192.168.2.0/30', '32',
+                [
+                    '192.168.2.0/32',
+                    '192.168.2.1/32',
+                    '192.168.2.2/32',
+                    '192.168.2.3/32',
+                ],
+            ],
+        ];
+    }
+
+    public static function getMoveToExceptionData(): array
+    {
+        return [
+            ['192.168.0.0/22', '22'],
+            ['192.168.0.0/22', '21'],
+            ['192.168.0.0/22', '33'],
+            ['192.168.0.0/22', 'prefixLength'],
+            ['192.168.0.0/22', '24abc'],
+        ];
+    }
+
+    public static function getTestIterationData(): array
+    {
+        return [
+            [
+                '192.168.2.0/29',
+                [
+                    '192.168.2.0',
+                    '192.168.2.1',
+                    '192.168.2.2',
+                    '192.168.2.3',
+                    '192.168.2.4',
+                    '192.168.2.5',
+                    '192.168.2.6',
+                    '192.168.2.7',
+                ],
+            ],
+            [
+                '2001:db8::/125',
+                [
+                    '2001:db8::',
+                    '2001:db8::1',
+                    '2001:db8::2',
+                    '2001:db8::3',
+                    '2001:db8::4',
+                    '2001:db8::5',
+                    '2001:db8::6',
+                    '2001:db8::7',
+                ],
+            ],
+        ];
+    }
+
+    public static function getTestCountData(): array
+    {
+        return [
+            ['127.0.0.0/31', 2],
+            ['2001:db8::/120', 256],
+        ];
+    }
+
     public function test_constructor(): void
     {
         $ipv4 = new IP('127.0.0.1');
@@ -163,158 +316,5 @@ final class NetworkTest extends TestCase
     public function test_count(string $data, int $expected): void
     {
         $this->assertCount($expected, Network::parse($data));
-    }
-
-    public function getTestParseData(): array
-    {
-        return [
-            ['192.168.0.54/24', '192.168.0.0/24'],
-            ['2001::2001:2001/32', '2001::/32'],
-            ['127.168.0.1 255.255.255.255', '127.168.0.1/32'],
-            ['1234::1234', '1234::1234/128'],
-        ];
-    }
-
-    public function getPrefixData(): array
-    {
-        return [
-            ['24', IP::IP_V4, IP::parse('255.255.255.0')],
-            ['32', IP::IP_V4, IP::parse('255.255.255.255')],
-            ['64', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff::')],
-            ['128', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')],
-        ];
-    }
-
-    public function getInvalidPrefixData(): array
-    {
-        return [
-            ['-1', IP::IP_V4],
-            ['33', IP::IP_V4],
-            ['-1', IP::IP_V6],
-            ['129', IP::IP_V6],
-        ];
-    }
-
-    public function getHostsData(): array
-    {
-        return [
-            [
-                '192.0.2.0/29',
-                [
-                    '192.0.2.1',
-                    '192.0.2.2',
-                    '192.0.2.3',
-                    '192.0.2.4',
-                    '192.0.2.5',
-                    '192.0.2.6',
-                ],
-            ],
-        ];
-    }
-
-    public function getExcludeData(): array
-    {
-        return [
-            [
-                '192.0.2.0/28', '192.0.2.1/32',
-                [
-                    '192.0.2.0/32',
-                    '192.0.2.2/31',
-                    '192.0.2.4/30',
-                    '192.0.2.8/29',
-                ],
-            ],
-            ['192.0.2.2/32', '192.0.2.2/32', []],
-        ];
-    }
-
-    public function getExcludeExceptionData(): array
-    {
-        return [
-            ['192.0.2.0/28', '192.0.3.0/24'],
-            ['192.0.2.2/32', '192.0.2.3/32'],
-        ];
-    }
-
-    public function getMoveToData(): array
-    {
-        return [
-            [
-                '192.168.0.0/22', '24',
-                [
-                    '192.168.0.0/24',
-                    '192.168.1.0/24',
-                    '192.168.2.0/24',
-                    '192.168.3.0/24',
-                ],
-            ],
-            [
-                '192.168.2.0/24', '25',
-                [
-                    '192.168.2.0/25',
-                    '192.168.2.128/25',
-                ],
-            ],
-            [
-                '192.168.2.0/30', '32',
-                [
-                    '192.168.2.0/32',
-                    '192.168.2.1/32',
-                    '192.168.2.2/32',
-                    '192.168.2.3/32',
-                ],
-            ],
-        ];
-    }
-
-    public function getMoveToExceptionData(): array
-    {
-        return [
-            ['192.168.0.0/22', '22'],
-            ['192.168.0.0/22', '21'],
-            ['192.168.0.0/22', '33'],
-            ['192.168.0.0/22', 'prefixLength'],
-            ['192.168.0.0/22', '24abc'],
-        ];
-    }
-
-    public function getTestIterationData(): array
-    {
-        return [
-            [
-                '192.168.2.0/29',
-                [
-                    '192.168.2.0',
-                    '192.168.2.1',
-                    '192.168.2.2',
-                    '192.168.2.3',
-                    '192.168.2.4',
-                    '192.168.2.5',
-                    '192.168.2.6',
-                    '192.168.2.7',
-                ],
-            ],
-            [
-                '2001:db8::/125',
-                [
-                    '2001:db8::',
-                    '2001:db8::1',
-                    '2001:db8::2',
-                    '2001:db8::3',
-                    '2001:db8::4',
-                    '2001:db8::5',
-                    '2001:db8::6',
-                    '2001:db8::7',
-                ],
-            ],
-        ];
-    }
-
-    public function getTestCountData(): array
-    {
-        return [
-            ['127.0.0.0/31', 2],
-            ['2001:db8::/120', 256],
-        ];
     }
 }
