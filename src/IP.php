@@ -83,7 +83,7 @@ class IP implements Stringable
         }
 
         $in_addr = '';
-        foreach (array_map('bindec', str_split($binIP, 8)) as $char) {
+        foreach (array_map(bindec(...), str_split($binIP, 8)) as $char) {
             $in_addr .= pack('C*', $char);
         }
 
