@@ -116,6 +116,9 @@ class IP implements Stringable
     {
         if ($version === self::IP_V4) {
             $ip = long2ip((int) $longIP);
+            if ($ip === false) {
+                throw new IpException('Invalid IP address format');
+            }
 
             return new self($ip);
         }
@@ -216,6 +219,15 @@ class IP implements Stringable
     public function toHex(): string
     {
         return bin2hex($this->in_addr);
+    }
+
+    public function expanded(): string
+    {
+        if ($this->getVersion() === self::IP_V4) {
+            return (string) $this;
+        }
+
+        return implode(':', str_split($this->toHex(), 4));
     }
 
     /**
