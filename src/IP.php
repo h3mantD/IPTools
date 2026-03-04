@@ -260,6 +260,69 @@ class IP implements Stringable
     }
 
     /**
+     * All IANA-classified types that apply to this address, in precedence order.
+     *
+     * @return list<IPType>
+     */
+    public function types(): array
+    {
+        return TypeRegistry::classify($this);
+    }
+
+    /**
+     * Primary type based on IANA precedence order.
+     */
+    public function primaryType(): IPType
+    {
+        return $this->types()[0];
+    }
+
+    public function is(IPType $type): bool
+    {
+        return in_array($type, $this->types(), true);
+    }
+
+    /**
+     * True if the address is globally routable unicast (not private/reserved/etc.).
+     */
+    public function isGlobalRoutable(): bool
+    {
+        return $this->primaryType() === IPType::GLOBAL;
+    }
+
+    public function isPrivate(): bool
+    {
+        $types = $this->types();
+
+        return in_array(IPType::PRIVATE, $types, true) || in_array(IPType::UNIQUE_LOCAL, $types, true);
+    }
+
+    public function isLoopback(): bool
+    {
+        return $this->is(IPType::LOOPBACK);
+    }
+
+    public function isMulticast(): bool
+    {
+        return $this->is(IPType::MULTICAST);
+    }
+
+    public function isLinkLocal(): bool
+    {
+        return $this->is(IPType::LINK_LOCAL);
+    }
+
+    public function isDocumentation(): bool
+    {
+        return $this->is(IPType::DOCUMENTATION);
+    }
+
+    public function isReserved(): bool
+    {
+        return $this->is(IPType::RESERVED);
+    }
+
+    /**
      * @throws IpException
      *
      * Note: this method wraps at the address-space boundary.
