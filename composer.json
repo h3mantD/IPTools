@@ -2,13 +2,27 @@
     "name": "h3mantd/iptools",
     "type": "library",
     "description": "PHP Library for manipulating network addresses (IPv4 and IPv6)",
-    "keywords": ["IP-Tools", "network", "subnet", "cidr", "IP", "IPv4", "IPv6"],
+    "keywords": [
+        "IP-Tools",
+        "network",
+        "subnet",
+        "cidr",
+        "IP",
+        "IPv4",
+        "IPv6"
+    ],
     "license": "MIT",
-    "authors": [{
-        "name": "Safarov Alisher",
-        "email": "alisher.safarov@outlook.com",
-        "homepage": "https://github.com/S1lentium"
-    }],
+    "authors": [
+        {
+            "name": "h3mantD",
+            "homepage": "https://github.com/h3mantD"
+        },
+        {
+            "name": "Safarov Alisher",
+            "email": "alisher.safarov@outlook.com",
+            "homepage": "https://github.com/S1lentium"
+        }
+    ],
     "require": {
         "php": "^8.2",
         "ext-bcmath": "*"
