@@ -115,7 +115,7 @@ class IP implements Stringable
     public static function parseLong(int|string $longIP, string $version = self::IP_V4): self
     {
         if ($version === self::IP_V4) {
-            $ip = (string) long2ip((int) $longIP);
+            $ip = long2ip((int) $longIP) ?: '';
 
             return new self($ip);
         }

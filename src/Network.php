@@ -103,7 +103,7 @@ class Network implements Countable, Iterator, Stringable
             return [];
         }
 
-        $parsedNetworks = array_map(static fn (string|self $network): self => self::parse($network), $networks);
+        $parsedNetworks = array_map(self::parse(...), $networks);
 
         usort($parsedNetworks, static function (self $first, self $second): int {
             $firstCompare = strcmp($first->getFirstIP()->inAddr(), $second->getFirstIP()->inAddr());

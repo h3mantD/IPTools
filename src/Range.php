@@ -139,7 +139,7 @@ class Range implements Countable, Iterator
         $currentIP = $firstIP;
 
         while (strcmp($currentIP->inAddr(), $lastIP->inAddr()) <= 0) {
-            $network = self::getLargestNetworkFrom($currentIP, $lastIP);
+            $network = $this->getLargestNetworkFrom($currentIP, $lastIP);
             yield $network;
 
             $nextIP = $network->getLastIP()->next();
@@ -153,7 +153,7 @@ class Range implements Countable, Iterator
 
     public function getFirstNetwork(): Network
     {
-        return self::getLargestNetworkFrom($this->getFirstIP(), $this->getLastIP());
+        return $this->getLargestNetworkFrom($this->getFirstIP(), $this->getLastIP());
     }
 
     public function getLastNetwork(): Network
@@ -257,7 +257,7 @@ class Range implements Countable, Iterator
         return max(0, (int) $count);
     }
 
-    private static function getLargestNetworkFrom(IP $firstIP, IP $lastIP): Network
+    private function getLargestNetworkFrom(IP $firstIP, IP $lastIP): Network
     {
         $maxPrefixLength = $firstIP->getMaxPrefixLength();
         $firstBinary = $firstIP->toBin();
