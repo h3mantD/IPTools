@@ -240,22 +240,22 @@ final class IPTest extends TestCase
     /**
      * @dataProvider getTestPrevData
      */
-    public function test_prev(string $ip, int $step, string $expected): void
+    public function test_previous(string $ip, int $step, string $expected): void
     {
         $object = new IP($ip);
-        $prev = $object->prev($step);
+        $prev = $object->previous($step);
 
         $this->assertEquals($expected, (string) $prev);
     }
 
-    public function test_prev_exception(): void
+    public function test_previous_exception(): void
     {
         $object = new IP('192.168.1.1');
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Number must be non-negative');
 
-        $object->prev(-1);
+        $object->previous(-1);
     }
 
     /**

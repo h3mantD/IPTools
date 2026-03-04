@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace IPTools;
 
+use InvalidArgumentException;
 use IPTools\Exception\IpException;
+use OverflowException;
 use Stringable;
 
 /**
@@ -322,75 +324,185 @@ class IP implements Stringable
         return $this->is(IPType::RESERVED);
     }
 
+    // -------------------------------------------------------------------------
+    // IP Arithmetic and Offset Operations
+    // -------------------------------------------------------------------------
+
     /**
-     * @throws IpException
+     * Compare to another IP of the same version.
+     * Returns -1, 0, or 1.
      *
-     * Note: this method wraps at the address-space boundary.
-     * Example: 255.255.255.255 -> 0.0.0.0
+     * @throws InvalidArgumentException if versions differ
      */
-    public function next(int $to = 1): self
+    public function compareTo(self $other): int
     {
-        if ($to < 0) {
-            throw new IpException('Number must be non-negative');
+        if ($this->getVersion() !== $other->getVersion()) {
+            throw new InvalidArgumentException('Cannot compare IPs of different versions');
         }
 
-        $unpacked = unpack('C*', $this->in_addr);
-        if ($unpacked === false) {
-            throw new IpException('Unable to unpack IP address');
-        }
-        /** @var array<int, int> $unpacked */
-        for ($i = 0; $i < $to; $i++) {
-            for ($byte = count($unpacked); $byte >= 1; $byte--) {
-                if ($unpacked[$byte] < 255) {
-                    $unpacked[$byte]++;
-                    break;
-                }
-
-                $unpacked[$byte] = 0;
-            }
-        }
-
-        $ip = inet_ntop(pack('C*', ...$unpacked));
-        if ($ip === false) {
-            throw new IpException('Invalid IP address format');
-        }
-
-        return new self($ip);
+        return strcmp($this->in_addr, $other->in_addr) <=> 0;
     }
 
     /**
-     * @throws IpException
+     * Signed distance from this to $other: $other - $this.
+     * Result is a decimal string (may be negative).
      *
-     * Note: this method wraps at the address-space boundary.
-     * Example: 0.0.0.0 -> 255.255.255.255
+     * @return numeric-string
+     *
+     * @throws InvalidArgumentException if versions differ
      */
-    public function prev(int $to = 1): self
+    public function distanceTo(self $other): string
     {
-        if ($to < 0) {
+        if ($this->getVersion() !== $other->getVersion()) {
+            throw new InvalidArgumentException('Cannot compute distance between IPs of different versions');
+        }
+
+        return bcsub($other->toLong(), $this->toLong());
+    }
+
+    /**
+     * Add a signed integer offset to this address.
+     *
+     * @throws OverflowException when mode is THROW and result is out of range
+     * @throws InvalidArgumentException when steps is negative
+     */
+    public function addOffset(int|string $delta, OverflowMode $mode = OverflowMode::THROW): ?self
+    {
+        /** @var numeric-string $delta */
+        $delta = (string) $delta;
+        $result = bcadd($this->toLong(), $delta);
+        $max = $this->maxLong();
+
+        $overflow = bccomp($result, $max) > 0;
+        $underflow = bccomp($result, '0') < 0;
+
+        if ($overflow || $underflow) {
+            return match ($mode) {
+                OverflowMode::THROW => throw new OverflowException(
+                    sprintf('IP address offset overflow (delta: %s)', $delta)
+                ),
+                OverflowMode::NULL => null,
+                OverflowMode::WRAP => self::parseLong(
+                    $this->wrapLong($result, $max),
+                    $this->getVersion()
+                ),
+                OverflowMode::CLAMP => self::parseLong(
+                    $underflow ? '0' : $max,
+                    $this->getVersion()
+                ),
+            };
+        }
+
+        return self::parseLong($result, $this->getVersion());
+    }
+
+    /**
+     * Return the address $steps ahead. Returns null at the address-space boundary.
+     *
+     * @throws InvalidArgumentException if steps is negative
+     */
+    public function next(int|string $steps = 1): ?self
+    {
+        /** @var numeric-string $s */
+        $s = (string) $steps;
+        if (bccomp($s, '0') < 0) {
             throw new IpException('Number must be non-negative');
         }
 
-        $unpacked = unpack('C*', $this->in_addr);
-        if ($unpacked === false) {
-            throw new IpException('Unable to unpack IP address');
-        }
-        /** @var array<int, int> $unpacked */
-        for ($i = 0; $i < $to; $i++) {
-            for ($byte = count($unpacked); $byte >= 1; $byte--) {
-                if ($unpacked[$byte] === 0) {
-                    $unpacked[$byte] = 255;
-                } else {
-                    $unpacked[$byte]--;
-                    break;
-                }
-            }
+        return $this->addOffset($s, OverflowMode::NULL);
+    }
+
+    /**
+     * Return the address $steps behind. Returns null at the address-space boundary.
+     *
+     * @throws InvalidArgumentException if steps is negative
+     */
+    public function previous(int|string $steps = 1): ?self
+    {
+        /** @var numeric-string $s */
+        $s = (string) $steps;
+        if (bccomp($s, '0') < 0) {
+            throw new IpException('Number must be non-negative');
         }
 
-        $ip = inet_ntop(pack('C*', ...$unpacked));
-        if ($ip === false) {
-            throw new IpException('Invalid IP address format');
+        return $this->addOffset('-'.$s, OverflowMode::NULL);
+    }
+
+    /**
+     * Shift bits right (positive $bits) or left (negative $bits).
+     * Right shifts never overflow. Left shifts may overflow.
+     *
+     * @throws OverflowException when mode is THROW and a left-shift overflows
+     */
+    public function shift(int $bits, OverflowMode $mode = OverflowMode::THROW): ?self
+    {
+        if ($bits === 0) {
+            return new self((string) $this);
         }
 
-        return new self($ip);
+        $value = $this->toLong();
+        $max = $this->maxLong();
+
+        if ($bits > 0) {
+            // Right shift: value >> bits = floor(value / 2^bits); always in [0, max]
+            $result = bcdiv($value, bcpow('2', (string) $bits), 0);
+
+            return self::parseLong($result, $this->getVersion());
+        }
+
+        // Left shift: value << (-bits) = value * 2^(-bits); may overflow
+        $absBits = (string) (-$bits);
+        $result = bcmul($value, bcpow('2', $absBits));
+
+        if (bccomp($result, $max) > 0) {
+            return match ($mode) {
+                OverflowMode::THROW => throw new OverflowException(
+                    sprintf('IP address bit-shift overflow (bits: %d)', $bits)
+                ),
+                OverflowMode::NULL => null,
+                OverflowMode::WRAP => self::parseLong(
+                    $this->wrapLong($result, $max),
+                    $this->getVersion()
+                ),
+                OverflowMode::CLAMP => self::parseLong($max, $this->getVersion()),
+            };
+        }
+
+        return self::parseLong($result, $this->getVersion());
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Maximum numeric value for this IP version as a decimal string.
+     *
+     * @return numeric-string
+     */
+    private function maxLong(): string
+    {
+        return $this->getVersion() === self::IP_V4
+            ? '4294967295'
+            : '340282366920938463463374607431768211455';
+    }
+
+    /**
+     * Wrap a value into [0, max] using modulo arithmetic.
+     *
+     * @param  numeric-string  $value
+     * @param  numeric-string  $max
+     * @return numeric-string
+     */
+    private function wrapLong(string $value, string $max): string
+    {
+        $modulus = bcadd($max, '1');
+        /** @var numeric-string $result */
+        $result = bcmod($value, $modulus);
+
+        // bcmod can return negative values in PHP for negative inputs
+        if (bccomp($result, '0') < 0) {
+            return bcadd($result, $modulus);
+        }
+
+        return $result;
     }
 }

@@ -308,7 +308,12 @@ class Network implements Countable, Iterator, Stringable
         $lower->setPrefixLength($newPrefixLength);
 
         $upper = clone $lower;
-        $upper->setIP($lower->getLastIP()->next());
+        $upperFirstIP = $lower->getLastIP()->next();
+        if (! $upperFirstIP instanceof IP) {
+            return $networks;
+        }
+
+        $upper->setIP($upperFirstIP);
 
         while ($newPrefixLength <= $exclude->getPrefixLength()) {
             $range = new Range($lower->getFirstIP(), $lower->getLastIP());
@@ -328,7 +333,12 @@ class Network implements Countable, Iterator, Stringable
 
             $matched->setPrefixLength($newPrefixLength);
             $unmatched->setPrefixLength($newPrefixLength);
-            $unmatched->setIP($matched->getLastIP()->next());
+            $nextIP = $matched->getLastIP()->next();
+            if (! $nextIP instanceof IP) {
+                break;
+            }
+
+            $unmatched->setIP($nextIP);
         }
 
         usort($networks, static fn (self $a, self $b): int => strcmp($a->getFirstIP()->inAddr(), $b->getFirstIP()->inAddr()));
@@ -366,7 +376,7 @@ class Network implements Countable, Iterator, Stringable
             $networks[] = $subnet;
 
             $nextIP = $subnet->getLastIP()->next();
-            if (strcmp($nextIP->inAddr(), $subnet->getFirstIP()->inAddr()) <= 0) {
+            if (! $nextIP instanceof IP) {
                 break;
             }
 
@@ -379,7 +389,12 @@ class Network implements Countable, Iterator, Stringable
     public function current(): IP
     {
         if (! $this->currentIP instanceof IP) {
-            $this->currentIP = $this->getFirstIP()->next($this->position);
+            $ip = $this->getFirstIP()->next($this->position);
+            if (! $ip instanceof IP) {
+                throw new NetworkException('Iterator position is out of range');
+            }
+
+            $this->currentIP = $ip;
         }
 
         return $this->currentIP;
@@ -395,7 +410,7 @@ class Network implements Countable, Iterator, Stringable
         $this->position++;
 
         if ($this->currentIP instanceof IP) {
-            $this->currentIP = $this->currentIP->next();
+            $this->currentIP = $this->currentIP->next(); // ?IP; null signals boundary
         }
     }
 
@@ -407,6 +422,11 @@ class Network implements Countable, Iterator, Stringable
 
     public function valid(): bool
     {
+        // next() set currentIP to null when the address-space boundary was reached
+        if (! $this->currentIP instanceof IP && $this->position > 0) {
+            return false;
+        }
+
         return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 
@@ -462,7 +482,12 @@ class Network implements Countable, Iterator, Stringable
             return null;
         }
 
-        if (strcmp($left->getLastIP()->next()->inAddr(), $right->getFirstIP()->inAddr()) !== 0) {
+        $nextAfterLeft = $left->getLastIP()->next();
+        if (! $nextAfterLeft instanceof IP) {
+            return null;
+        }
+
+        if (strcmp($nextAfterLeft->inAddr(), $right->getFirstIP()->inAddr()) !== 0) {
             return null;
         }
 
