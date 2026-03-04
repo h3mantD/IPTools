@@ -107,6 +107,27 @@ final class NetworkTest extends TestCase
                     '192.168.2.3/32',
                 ],
             ],
+            [
+                '240.0.0.0/4', '5',
+                [
+                    '240.0.0.0/5',
+                    '248.0.0.0/5',
+                ],
+            ],
+            [
+                '248.0.0.0/5', '6',
+                [
+                    '248.0.0.0/6',
+                    '252.0.0.0/6',
+                ],
+            ],
+            [
+                '224.0.0.0/3', '4',
+                [
+                    '224.0.0.0/4',
+                    '240.0.0.0/4',
+                ],
+            ],
         ];
     }
 
@@ -158,6 +179,33 @@ final class NetworkTest extends TestCase
         return [
             ['127.0.0.0/31', 2],
             ['2001:db8::/120', 256],
+        ];
+    }
+
+    public static function getPreciseCountData(): array
+    {
+        return [
+            ['2001:db8::/64', '18446744073709551616', PHP_INT_MAX],
+            ['2001:db8::/48', '1208925819614629174706176', PHP_INT_MAX],
+            ['2001:db8::/128', '1', 1],
+        ];
+    }
+
+    public static function getSummarizeData(): array
+    {
+        return [
+            [
+                ['192.168.0.0/25', '192.168.0.128/25'],
+                ['192.168.0.0/24'],
+            ],
+            [
+                ['10.0.0.0/24', '10.0.0.0/25', '10.0.0.128/25', '10.0.1.0/24'],
+                ['10.0.0.0/23'],
+            ],
+            [
+                ['2001:db8::/65', '2001:db8:0:0:8000::/65'],
+                ['2001:db8::/64'],
+            ],
         ];
     }
 
@@ -316,5 +364,29 @@ final class NetworkTest extends TestCase
     public function test_count(string $data, int $expected): void
     {
         $this->assertCount($expected, Network::parse($data));
+    }
+
+    /**
+     * @dataProvider getPreciseCountData
+     */
+    public function test_count_precise(string $data, string $expectedPrecise, int $expectedCount): void
+    {
+        $network = Network::parse($data);
+
+        $this->assertSame($expectedPrecise, $network->getCountPrecise());
+        $this->assertSame($expectedCount, count($network));
+    }
+
+    /**
+     * @dataProvider getSummarizeData
+     */
+    public function test_summarize(array $data, array $expected): void
+    {
+        $result = [];
+        foreach (Network::summarize($data) as $network) {
+            $result[] = (string) $network;
+        }
+
+        $this->assertSame($expected, $result);
     }
 }

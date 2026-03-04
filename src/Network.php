@@ -94,6 +94,65 @@ class Network implements Countable, Iterator, Stringable
     }
 
     /**
+     * @param  array<int, string|self>  $networks
+     * @return Network[]
+     */
+    public static function summarize(array $networks): array
+    {
+        if ($networks === []) {
+            return [];
+        }
+
+        $parsedNetworks = array_map(self::parse(...), $networks);
+
+        usort($parsedNetworks, static function (self $first, self $second): int {
+            $firstCompare = strcmp($first->getFirstIP()->inAddr(), $second->getFirstIP()->inAddr());
+            if ($firstCompare !== 0) {
+                return $firstCompare;
+            }
+
+            return $first->getPrefixLength() <=> $second->getPrefixLength();
+        });
+
+        $normalized = [];
+        foreach ($parsedNetworks as $network) {
+            $lastNormalized = $normalized[count($normalized) - 1] ?? null;
+
+            if ($lastNormalized instanceof self
+                && self::containsNetwork($lastNormalized, $network)
+            ) {
+                continue;
+            }
+
+            $normalized[] = $network;
+        }
+
+        do {
+            $changed = false;
+            $collapsed = [];
+
+            foreach ($normalized as $network) {
+                $lastCollapsed = $collapsed[count($collapsed) - 1] ?? null;
+                if ($lastCollapsed instanceof self) {
+                    $merged = self::tryMergeAdjacent($lastCollapsed, $network);
+                    if ($merged instanceof self) {
+                        $collapsed[count($collapsed) - 1] = $merged;
+                        $changed = true;
+
+                        continue;
+                    }
+                }
+
+                $collapsed[] = $network;
+            }
+
+            $normalized = $collapsed;
+        } while ($changed);
+
+        return $normalized;
+    }
+
+    /**
      * @throws NetworkException
      */
     public function setIP(IP $ip): void
@@ -301,10 +360,17 @@ class Network implements Countable, Iterator, Stringable
 
         $subnet = clone $this;
         $subnet->setPrefixLength($prefixLength);
+        $targetLastInAddr = $this->getLastIP()->inAddr();
 
-        while ($subnet->getIP()->inAddr() <= $this->getLastIP()->inAddr()) {
+        while (strcmp($subnet->getFirstIP()->inAddr(), $targetLastInAddr) <= 0) {
             $networks[] = $subnet;
-            $subnet = new self($subnet->getLastIP()->next(), $netmask);
+
+            $nextIP = $subnet->getLastIP()->next();
+            if (strcmp($nextIP->inAddr(), $subnet->getFirstIP()->inAddr()) <= 0) {
+                break;
+            }
+
+            $subnet = new self($nextIP, $netmask);
         }
 
         return $networks;
@@ -344,12 +410,71 @@ class Network implements Countable, Iterator, Stringable
         return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 
+    public function getCountPrecise(): string
+    {
+        return (string) $this->getBlockSize();
+    }
+
     /**
      * Note: Countable requires int; very large IPv6 blocks may exceed PHP_INT_MAX.
-     * Use getBlockSize() for precise big-integer size information.
+     * Use getCountPrecise() for precise big-integer size information.
      */
     public function count(): int
     {
-        return max(0, (int) $this->getBlockSize());
+        $count = $this->getBlockSize();
+
+        if (is_int($count)) {
+            return max(0, $count);
+        }
+
+        $maxIntString = (string) PHP_INT_MAX;
+        if (strlen($count) > strlen($maxIntString)
+            || (strlen($count) === strlen($maxIntString) && strcmp($count, $maxIntString) > 0)
+        ) {
+            return PHP_INT_MAX;
+        }
+
+        return max(0, (int) $count);
+    }
+
+    private static function containsNetwork(self $container, self $contained): bool
+    {
+        if ($container->getIP()->getVersion() !== $contained->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($contained->getFirstIP()->inAddr(), $container->getFirstIP()->inAddr()) >= 0
+            && strcmp($contained->getLastIP()->inAddr(), $container->getLastIP()->inAddr()) <= 0;
+    }
+
+    private static function tryMergeAdjacent(self $left, self $right): ?self
+    {
+        if ($left->getIP()->getVersion() !== $right->getIP()->getVersion()) {
+            return null;
+        }
+
+        if ($left->getPrefixLength() !== $right->getPrefixLength()) {
+            return null;
+        }
+
+        $prefixLength = $left->getPrefixLength();
+        if ($prefixLength === 0) {
+            return null;
+        }
+
+        if (strcmp($left->getLastIP()->next()->inAddr(), $right->getFirstIP()->inAddr()) !== 0) {
+            return null;
+        }
+
+        $supernetPrefix = $prefixLength - 1;
+        $supernet = new self($left->getFirstIP(), self::prefix2netmask($supernetPrefix, $left->getIP()->getVersion()));
+
+        if (strcmp($supernet->getFirstIP()->inAddr(), $left->getFirstIP()->inAddr()) !== 0
+            || strcmp($supernet->getLastIP()->inAddr(), $right->getLastIP()->inAddr()) !== 0
+        ) {
+            return null;
+        }
+
+        return $supernet;
     }
 }

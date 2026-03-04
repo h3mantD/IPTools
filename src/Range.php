@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace IPTools;
 
 use Countable;
+use Generator;
 use IPTools\Exception\RangeException;
 use Iterator;
 
@@ -125,45 +126,63 @@ class Range implements Countable, Iterator
      */
     public function getNetworks(): array
     {
-        $span = $this->getSpanNetwork();
+        return iterator_to_array($this->iterateNetworks(), false);
+    }
+
+    /**
+     * @return Generator<int, Network>
+     */
+    public function iterateNetworks(): Generator
+    {
         $firstIP = $this->getFirstIP();
         $lastIP = $this->getLastIP();
+        $currentIP = $firstIP;
 
-        $networks = [];
+        while (strcmp($currentIP->inAddr(), $lastIP->inAddr()) <= 0) {
+            $network = $this->getLargestNetworkFrom($currentIP, $lastIP);
+            yield $network;
 
-        if ($span->getFirstIP()->inAddr() === $firstIP->inAddr()
-            && $span->getLastIP()->inAddr() === $lastIP->inAddr()
-        ) {
-            $networks = [$span];
-        } else {
-            if ($span->getFirstIP()->inAddr() !== $firstIP->inAddr()) {
-                $excluded = $span->exclude($firstIP->prev());
-                foreach ($excluded as $network) {
-                    if (strcmp($network->getFirstIP()->inAddr(), $firstIP->inAddr()) >= 0) {
-                        $networks[] = $network;
-                    }
-                }
+            $nextIP = $network->getLastIP()->next();
+            if (strcmp($nextIP->inAddr(), $currentIP->inAddr()) <= 0) {
+                break;
             }
 
-            if ($span->getLastIP()->inAddr() !== $lastIP->inAddr()) {
-                if ($networks === []) {
-                    $excluded = $span->exclude($lastIP->next());
-                } else {
-                    $excluded = array_pop($networks);
-                    $excluded = $excluded->exclude($lastIP->next());
-                }
+            $currentIP = $nextIP;
+        }
+    }
 
-                foreach ($excluded as $network) {
-                    $networks[] = $network;
-                    if ($network->getLastIP()->inAddr() === $lastIP->inAddr()) {
-                        break;
-                    }
-                }
-            }
+    public function getFirstNetwork(): Network
+    {
+        return $this->getLargestNetworkFrom($this->getFirstIP(), $this->getLastIP());
+    }
 
+    public function getLastNetwork(): Network
+    {
+        $lastNetwork = null;
+        foreach ($this->iterateNetworks() as $network) {
+            $lastNetwork = $network;
         }
 
-        return $networks;
+        if (! $lastNetwork instanceof Network) {
+            throw new RangeException('Unable to determine last network');
+        }
+
+        return $lastNetwork;
+    }
+
+    public function getNthNetwork(int $index): ?Network
+    {
+        if ($index < 0) {
+            throw new RangeException('Network index must be non-negative');
+        }
+
+        foreach ($this->iterateNetworks() as $position => $network) {
+            if ($position === $index) {
+                return $network;
+            }
+        }
+
+        return null;
     }
 
     public function getSpanNetwork(): Network
@@ -216,14 +235,56 @@ class Range implements Countable, Iterator
     }
 
     /**
+     * @return numeric-string
+     */
+    public function getCountPrecise(): string
+    {
+        return bcadd(bcsub($this->getLastIP()->toLong(), $this->getFirstIP()->toLong()), '1');
+    }
+
+    /**
      * Note: Countable requires int; very large IPv6 ranges may exceed PHP_INT_MAX.
-     * For precise large-range sizes, compare getFirstIP()/getLastIP() or use BCMath externally.
+     * Use getCountPrecise() for precise big-integer size information.
      */
     public function count(): int
     {
-        $lastLong = $this->getLastIP()->toLong();
-        $firstLong = $this->getFirstIP()->toLong();
+        $count = $this->getCountPrecise();
 
-        return max(0, (int) bcadd(bcsub($lastLong, $firstLong), '1'));
+        if (bccomp($count, (string) PHP_INT_MAX) === 1) {
+            return PHP_INT_MAX;
+        }
+
+        return max(0, (int) $count);
+    }
+
+    private function getLargestNetworkFrom(IP $firstIP, IP $lastIP): Network
+    {
+        $maxPrefixLength = $firstIP->getMaxPrefixLength();
+        $firstBinary = $firstIP->toBin();
+        $lastBinary = $lastIP->toBin();
+
+        $trailingZeros = 0;
+        for ($position = $maxPrefixLength - 1; $position >= 0; $position--) {
+            if ($firstBinary[$position] !== '0') {
+                break;
+            }
+
+            $trailingZeros++;
+        }
+
+        $hostBits = 0;
+        for ($candidateHostBits = $trailingZeros; $candidateHostBits >= 0; $candidateHostBits--) {
+            $prefixLength = $maxPrefixLength - $candidateHostBits;
+            $candidateLastBinary = substr($firstBinary, 0, $prefixLength).str_repeat('1', $candidateHostBits);
+
+            if (strcmp($candidateLastBinary, $lastBinary) <= 0) {
+                $hostBits = $candidateHostBits;
+                break;
+            }
+        }
+
+        $prefixLength = $maxPrefixLength - $hostBits;
+
+        return new Network($firstIP, Network::prefix2netmask($prefixLength, $firstIP->getVersion()));
     }
 }

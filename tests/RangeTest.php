@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPTools\IP;
+use IPTools\Network;
 use IPTools\Range;
 use PHPUnit\Framework\TestCase;
 
@@ -38,6 +39,14 @@ final class RangeTest extends TestCase
                 '192.168.1.125-192.168.1.126', [
                     '192.168.1.125/32',
                     '192.168.1.126/32',
+                ],
+            ],
+            [
+                '49.12.11.10-49.12.11.35', [
+                    '49.12.11.10/31',
+                    '49.12.11.12/30',
+                    '49.12.11.16/28',
+                    '49.12.11.32/30',
                 ],
             ],
         ];
@@ -100,6 +109,15 @@ final class RangeTest extends TestCase
         ];
     }
 
+    public static function getPreciseCountData(): array
+    {
+        return [
+            ['2001:db8::/64', '18446744073709551616', PHP_INT_MAX],
+            ['2001:db8::/48', '1208925819614629174706176', PHP_INT_MAX],
+            ['2001:db8::/128', '1', 1],
+        ];
+    }
+
     /**
      * @dataProvider getTestParseData
      */
@@ -123,6 +141,46 @@ final class RangeTest extends TestCase
         }
 
         $this->assertEquals($expected, $result);
+    }
+
+    public function test_iterate_networks(): void
+    {
+        $result = [];
+        foreach (Range::parse('192.168.1.208-192.168.1.255')->iterateNetworks() as $network) {
+            $result[] = (string) $network;
+        }
+
+        $this->assertSame(['192.168.1.208/28', '192.168.1.224/27'], $result);
+    }
+
+    public function test_network_selectors(): void
+    {
+        $range = Range::parse('49.12.11.10-49.12.11.35');
+
+        $this->assertSame('49.12.11.10/31', (string) $range->getFirstNetwork());
+        $this->assertSame('49.12.11.32/30', (string) $range->getLastNetwork());
+        $this->assertSame('49.12.11.16/28', (string) $range->getNthNetwork(2));
+        $this->assertNull($range->getNthNetwork(10));
+    }
+
+    public function test_get_nth_network_exception(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Network index must be non-negative');
+
+        Range::parse('192.168.1.*')->getNthNetwork(-1);
+    }
+
+    public function test_network_selectors_single_network_range(): void
+    {
+        $range = Range::parse('2001:db8::/64');
+
+        $this->assertSame('2001:db8::/64', (string) $range->getFirstNetwork());
+        $this->assertSame('2001:db8::/64', (string) $range->getLastNetwork());
+
+        $nthNetwork = $range->getNthNetwork(0);
+        $this->assertInstanceOf(Network::class, $nthNetwork);
+        $this->assertSame('2001:db8::/64', (string) $nthNetwork);
     }
 
     /**
@@ -152,6 +210,17 @@ final class RangeTest extends TestCase
     public function test_count(string $data, int $expected): void
     {
         $this->assertEquals($expected, count(Range::parse($data)));
+    }
+
+    /**
+     * @dataProvider getPreciseCountData
+     */
+    public function test_count_precise(string $data, string $expectedPrecise, int $expectedCount): void
+    {
+        $range = Range::parse($data);
+
+        $this->assertSame($expectedPrecise, $range->getCountPrecise());
+        $this->assertSame($expectedCount, count($range));
     }
 
     public function test_constructor_rejects_mixed_ip_versions(): void

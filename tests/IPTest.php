@@ -84,6 +84,15 @@ final class IPTest extends TestCase
         ];
     }
 
+    public static function getExpandedData(): array
+    {
+        return [
+            ['127.0.0.1', '127.0.0.1'],
+            ['2001:db8::1', '2001:0db8:0000:0000:0000:0000:0000:0001'],
+            ['::', '0000:0000:0000:0000:0000:0000:0000:0000'],
+        ];
+    }
+
     public function test_constructor(): void
     {
         $ipv4String = '127.0.0.1';
@@ -257,5 +266,16 @@ final class IPTest extends TestCase
         $object = new IP($ip);
         $reversePointer = $object->getReversePointer();
         $this->assertEquals($expected, $reversePointer);
+    }
+
+    /**
+     * @dataProvider getExpandedData
+     */
+    public function test_expanded(string $ip, string $expected): void
+    {
+        $object = new IP($ip);
+
+        $this->assertSame($expected, $object->expanded());
+        $this->assertSame($expected, $object->expanded);
     }
 }
