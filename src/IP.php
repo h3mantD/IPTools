@@ -115,10 +115,7 @@ class IP implements Stringable
     public static function parseLong(int|string $longIP, string $version = self::IP_V4): self
     {
         if ($version === self::IP_V4) {
-            $ip = long2ip((int) $longIP);
-            if ($ip === false) {
-                throw new IpException('Invalid IP address format');
-            }
+            $ip = (string) long2ip((int) $longIP);
 
             return new self($ip);
         }
