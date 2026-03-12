@@ -140,6 +140,25 @@ $nat64 = IP::toNat64(new IP('8.8.8.8')); // 64:ff9b::808:808
 echo (string) IP::fromNat64($nat64); // 8.8.8.8
 ```
 
+### Flexible Parsing (RFC-0004)
+
+```php
+use IPTools\ParseFlags;
+use IPTools\Parser;
+
+$parsed = Parser::ip('[2001:db8::1]:443');
+echo (string) $parsed->ip; // 2001:db8::1
+echo $parsed->port; // 443
+
+$zoned = Parser::ip('fe80::1%eth0');
+echo $zoned->zoneId; // eth0
+
+echo (string) Parser::ip('0x0a000001')->ip; // 10.0.0.1
+echo (string) Parser::range('192.168.*.*'); // 192.168.0.0/16
+
+Parser::ip('1.2.3.4:80', ParseFlags::STRICT); // throws in strict mode
+```
+
 ### Network Operations
 
 ```php
