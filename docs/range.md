@@ -1,6 +1,6 @@
 # Range Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 `IPTools\Range` models inclusive `[firstIP, lastIP]` intervals.
 

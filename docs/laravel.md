@@ -1,6 +1,6 @@
 # Laravel Integration Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 Laravel integration is optional and built on top of the core storage layer.
 

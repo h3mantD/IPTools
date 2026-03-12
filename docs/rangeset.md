@@ -1,6 +1,6 @@
 # RangeSet Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 `IPTools\RangeSet` is a canonical set of disjoint ranges with set algebra operations.
 

@@ -36,6 +36,17 @@ or put in composer.json:
 
 For full documentation, see `docs/README.md`.
 
+Detailed guides:
+
+- [IP Guide](docs/ip.md)
+- [Parser Guide](docs/parser.md)
+- [Network Guide](docs/network.md)
+- [Range Guide](docs/range.md)
+- [RangeSet Guide](docs/rangeset.md)
+- [Storage Guide](docs/storage.md)
+- [Laravel Integration Guide](docs/laravel.md)
+- [API Reference](docs/api-reference.md)
+
 ### IP Operations
 
 ```php

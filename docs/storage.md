@@ -1,6 +1,6 @@
 # Storage Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 IPTools includes optional DB-backed range storage for fast membership lookups.
 

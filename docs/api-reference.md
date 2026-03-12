@@ -1,6 +1,6 @@
 # API Reference
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 This file summarizes the public API surface for the main package classes.
 

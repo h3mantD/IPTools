@@ -1,6 +1,6 @@
 # IP Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 The `IPTools\IP` class is the core value object for individual IP addresses.
 

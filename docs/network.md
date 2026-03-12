@@ -1,6 +1,6 @@
 # Network Guide
 
-Back to index: `docs/README.md`
+Back to index: [Documentation Index](README.md)
 
 `IPTools\Network` models CIDR blocks and provides subnet math, host helpers, iteration, and decomposition.
 
