@@ -244,6 +244,148 @@ class Network implements Countable, Iterator, Stringable
         return new IP($broadcast);
     }
 
+    public function networkAddress(): IP
+    {
+        return $this->getNetwork();
+    }
+
+    public function broadcastAddress(): IP
+    {
+        return $this->getBroadcast();
+    }
+
+    public function firstHost(): IP
+    {
+        $network = $this->getNetwork();
+
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $network;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $network;
+        }
+
+        $host = $network->next();
+        if (! $host instanceof IP) {
+            throw new NetworkException('Unable to calculate first host address');
+        }
+
+        return $host;
+    }
+
+    public function lastHost(): IP
+    {
+        $broadcast = $this->getBroadcast();
+
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $broadcast;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $broadcast;
+        }
+
+        $host = $broadcast->previous();
+        if (! $host instanceof IP) {
+            throw new NetworkException('Unable to calculate last host address');
+        }
+
+        return $host;
+    }
+
+    /**
+     * Returns usable address count.
+     * IPv4 /31 and /32 are treated as fully usable.
+     * IPv6 has no broadcast reservation, so all addresses are usable.
+     */
+    public function usableHostCount(): string|int
+    {
+        $blockSize = $this->getBlockSize();
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $blockSize;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $blockSize;
+        }
+
+        if (is_int($blockSize)) {
+            return max(0, $blockSize - 2);
+        }
+
+        /** @var numeric-string $blockSize */
+
+        return bcsub($blockSize, '2');
+    }
+
+    public function isPointToPoint(): bool
+    {
+        if ($this->getIP()->getVersion() === IP::IP_V4 && $this->getPrefixLength() === 31) {
+            return true;
+        }
+
+        return $this->getIP()->getVersion() === IP::IP_V6 && $this->getPrefixLength() === 127;
+    }
+
+    public function containsIP(IP|string $ip): bool
+    {
+        $candidate = $ip instanceof IP ? $ip : IP::parse($ip);
+        if ($candidate->getVersion() !== $this->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($candidate->inAddr(), $this->getFirstIP()->inAddr()) >= 0
+            && strcmp($candidate->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+    }
+
+    public function containsRange(Range|self|IP|string $range): bool
+    {
+        if ($range instanceof self) {
+            $candidate = new Range($range->getFirstIP(), $range->getLastIP());
+        } elseif ($range instanceof Range) {
+            $candidate = $range;
+        } elseif ($range instanceof IP) {
+            $candidate = new Range($range, $range);
+        } else {
+            $candidate = Range::parse($range);
+        }
+
+        if ($candidate->getFirstIP()->getVersion() !== $this->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($candidate->getFirstIP()->inAddr(), $this->getFirstIP()->inAddr()) >= 0
+            && strcmp($candidate->getLastIP()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+    }
+
+    public function nextSubnet(): ?self
+    {
+        $step = (string) $this->getBlockSize();
+        /** @var numeric-string $step */
+        $version = $this->getIP()->getVersion();
+        $max = $version === IP::IP_V4 ? IP::IP_V4_MAX_LONG : IP::IP_V6_MAX_LONG;
+        $nextLong = bcadd($this->getNetwork()->toLong(), $step);
+        if (bccomp($nextLong, $max) > 0) {
+            return null;
+        }
+
+        return new self(IP::parseLong($nextLong, $version), $this->getNetmask());
+    }
+
+    public function previousSubnet(): ?self
+    {
+        $step = (string) $this->getBlockSize();
+        /** @var numeric-string $step */
+        $version = $this->getIP()->getVersion();
+        $prevLong = bcsub($this->getNetwork()->toLong(), $step);
+        if (bccomp($prevLong, '0') < 0) {
+            return null;
+        }
+
+        return new self(IP::parseLong($prevLong, $version), $this->getNetmask());
+    }
+
     public function getFirstIP(): IP
     {
         return $this->getNetwork();

@@ -295,6 +295,35 @@ echo (string)Network::parse('192.0.0.1/8')->netmask; // 255.0.0.0
 echo (string)Network::parse('192.0.0.1'); // 192.0.0.1/32
 ```
 
+**Convenience helpers (RFC-0007):**
+
+```php
+$network = Network::parse('192.0.2.130/24');
+
+echo (string) $network->networkAddress(); // 192.0.2.0
+echo (string) $network->broadcastAddress(); // 192.0.2.255
+echo (string) $network->firstHost(); // 192.0.2.1
+echo (string) $network->lastHost(); // 192.0.2.254
+echo $network->usableHostCount(); // 254
+
+var_dump($network->containsIP('192.0.2.42')); // true
+var_dump($network->containsRange('192.0.2.10-192.0.2.20')); // true
+
+echo (string) $network->nextSubnet(); // 192.0.3.0/24
+echo (string) $network->previousSubnet(); // 192.0.1.0/24
+```
+
+Point-to-point behavior:
+
+```php
+$v4p2p = Network::parse('198.51.100.0/31');
+var_dump($v4p2p->isPointToPoint()); // true
+echo $v4p2p->usableHostCount(); // 2
+
+$v6p2p = Network::parse('2001:db8::/127');
+var_dump($v6p2p->isPointToPoint()); // true
+```
+
 **Exclude IP from Network:**
 
 ```php
