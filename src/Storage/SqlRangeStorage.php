@@ -107,14 +107,15 @@ final class SqlRangeStorage implements RangeStorageInterface
         $statement->execute();
 
         while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
-            /** @var array{start_bin: string, end_bin: string, metadata: string|null} $row */
-            $start = AddressCodec::from16($row['start_bin'], $version);
-            $end = AddressCodec::from16($row['end_bin'], $version);
+            /** @var array{start_bin: mixed, end_bin: mixed, metadata: mixed} $row */
+            $start = AddressCodec::from16($this->readBinaryColumn($row['start_bin']), $version);
+            $end = AddressCodec::from16($this->readBinaryColumn($row['end_bin']), $version);
 
             /** @var array<string, mixed> $metadata */
             $metadata = [];
-            if ($row['metadata'] !== null && $row['metadata'] !== '') {
-                $decoded = json_decode($row['metadata'], true, 512, JSON_THROW_ON_ERROR);
+            $metadataJson = $this->readTextColumn($row['metadata']);
+            if ($metadataJson !== null && $metadataJson !== '') {
+                $decoded = json_decode($metadataJson, true, 512, JSON_THROW_ON_ERROR);
                 if (is_array($decoded)) {
                     /** @var array<string, mixed> $decoded */
                     $metadata = $decoded;
@@ -179,5 +180,51 @@ final class SqlRangeStorage implements RangeStorageInterface
                 $throwable
             );
         }
+    }
+
+    private function readBinaryColumn(mixed $value): string
+    {
+        if (is_resource($value)) {
+            $content = stream_get_contents($value);
+
+            if ($content === false) {
+                throw new RuntimeException('Unable to read binary column stream');
+            }
+
+            return $content;
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        throw new RuntimeException('Unexpected binary column value type');
+    }
+
+    private function readTextColumn(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_resource($value)) {
+            $content = stream_get_contents($value);
+
+            if ($content === false) {
+                throw new RuntimeException('Unable to read text column stream');
+            }
+
+            return $content;
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        throw new RuntimeException('Unexpected text column value type');
     }
 }
