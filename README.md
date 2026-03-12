@@ -159,6 +159,134 @@ echo (string) Parser::range('192.168.*.*'); // 192.168.0.0/16
 Parser::ip('1.2.3.4:80', ParseFlags::STRICT); // throws in strict mode
 ```
 
+### Database-Backed Range Lookup (RFC-0005)
+
+This module is optional. If you do not need database-backed lookups, you can skip this entire section and continue using the in-memory IP/Network/Range features.
+
+```php
+use IPTools\IP;
+use IPTools\Network;
+use IPTools\Storage\SqlRangeStorage;
+
+$pdo = new PDO('sqlite::memory:');
+$pdo->exec('CREATE TABLE ip_ranges (id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL, start_bin BLOB NOT NULL, end_bin BLOB NOT NULL, metadata TEXT NULL)');
+
+$storage = new SqlRangeStorage($pdo);
+$storage->store(Network::parse('192.0.2.0/24'), ['source' => 'docs']);
+
+var_dump($storage->contains(new IP('192.0.2.10'))); // true
+
+foreach ($storage->findContaining(new IP('192.0.2.10')) as $match) {
+    echo $match['range']->getFirstIP() . '-' . $match['range']->getLastIP() . PHP_EOL;
+}
+```
+
+MySQL schema:
+
+```sql
+CREATE TABLE ip_ranges (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  version TINYINT NOT NULL,
+  start_bin BINARY(16) NOT NULL,
+  end_bin   BINARY(16) NOT NULL,
+  metadata  JSON NULL,
+  KEY idx_lookup (version, start_bin, end_bin)
+) ENGINE=InnoDB;
+```
+
+PostgreSQL schema:
+
+```sql
+CREATE TABLE ip_ranges (
+  id BIGSERIAL PRIMARY KEY,
+  version SMALLINT NOT NULL,
+  start_bin BYTEA NOT NULL,
+  end_bin   BYTEA NOT NULL,
+  metadata  JSONB NULL
+);
+
+CREATE INDEX idx_lookup ON ip_ranges (version, start_bin, end_bin);
+```
+
+#### Laravel Usage Notes
+
+Laravel integration is optional. The package can run as plain PHP without Laravel, and DB-backed storage is only needed when you want persisted range lookup.
+
+Dependency behavior:
+- This package does not force-install Laravel components for all users.
+- `illuminate/*` entries in this repository are used for package development/static analysis and to document optional integration.
+- If your project is a normal Laravel app (`laravel/framework`), Illuminate dependencies are already present.
+- If your project is not a Laravel app but you still want Laravel integration helpers, install them explicitly:
+
+```bash
+composer require illuminate/support illuminate/database
+```
+
+Laravel classes are provided under normal package namespaces (not under a dedicated `Laravel/` directory):
+- `IPTools\IPToolsServiceProvider`
+- `IPTools\Storage\LaravelRangeStorage`
+- `IPTools\Models\IpRange`
+
+If your app uses package auto-discovery, the service provider is registered automatically.
+
+1) Publish config (optional but recommended):
+
+```bash
+php artisan vendor:publish --tag=iptools-config
+```
+
+2) Publish migration (optional, only if you need DB-backed storage) and migrate:
+
+```bash
+php artisan vendor:publish --tag=iptools-migrations
+php artisan migrate
+```
+
+If you skip migration and call storage APIs, the package throws a clear runtime exception that the table is missing.
+
+3) Resolve storage from container (recommended):
+
+```php
+use IPTools\IP;
+use IPTools\Network;
+use IPTools\Storage\RangeStorageInterface;
+
+$storage = app(RangeStorageInterface::class);
+
+$storage->store(Network::parse('10.0.0.0/24'), [
+    'policy' => 'allow',
+    'source' => 'admin',
+]);
+
+var_dump($storage->contains(new IP('10.0.0.42'))); // true
+```
+
+4) Direct adapter usage with Laravel connection:
+
+```php
+use IPTools\IP;
+use IPTools\Network;
+use IPTools\Storage\LaravelRangeStorage;
+
+$storage = new LaravelRangeStorage(DB::connection(), 'ip_ranges');
+
+$storage->store(Network::parse('10.0.0.0/24'), ['policy' => 'allow']);
+var_dump($storage->contains(new IP('10.0.0.42'))); // true
+```
+
+5) Optional model publishing:
+
+```bash
+php artisan vendor:publish --tag=iptools-model
+```
+
+This publishes `app/Models/IpRange.php` so your app can customize Eloquent behavior while keeping storage APIs available.
+
+Notes:
+- `start_bin` and `end_bin` are stored as fixed-width 16-byte values for deterministic lexicographic comparison.
+- IPv4 addresses are encoded as `12` zero bytes + `4` IPv4 bytes.
+- Storage queries are inclusive at both boundaries (`start_bin <= addr <= end_bin`).
+
 ### Network Operations
 
 ```php
