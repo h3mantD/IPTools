@@ -34,6 +34,8 @@ or put in composer.json:
 
 ## Usage
 
+For full documentation, see `docs/README.md`.
+
 ### IP Operations
 
 ```php
@@ -87,7 +89,7 @@ echo IP::parse('192.0.2.5')->reversePointer; // 5.2.0.192.in-addr.arpa
 echo IP::parse('2001:db8::567:89ab')->reversePointer; // b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa
 ```
 
-### IP Type Classification (RFC-0001)
+### IP Type Classification
 
 ```php
 $ip = new IP('127.0.0.1');
@@ -100,7 +102,7 @@ $types = (new IP('233.252.0.1'))->types();
 // MULTICAST + DOCUMENTATION (precedence keeps MULTICAST as primary)
 ```
 
-### IP Arithmetic and Offsets (RFC-0002)
+### IP Arithmetic and Offsets
 
 ```php
 $ip = new IP('0.0.0.1');
@@ -124,7 +126,7 @@ echo (string) $max->addOffset(1, OverflowMode::WRAP); // 0.0.0.0
 echo (string) $max->addOffset(1, OverflowMode::CLAMP); // 255.255.255.255
 ```
 
-### IPv4 <-> IPv6 Conversions (RFC-0003)
+### IPv4 <-> IPv6 Conversions
 
 ```php
 // IPv4-mapped
@@ -140,7 +142,7 @@ $nat64 = IP::toNat64(new IP('8.8.8.8')); // 64:ff9b::808:808
 echo (string) IP::fromNat64($nat64); // 8.8.8.8
 ```
 
-### Flexible Parsing (RFC-0004)
+### Flexible Parsing
 
 ```php
 use IPTools\ParseFlags;
@@ -159,7 +161,7 @@ echo (string) Parser::range('192.168.*.*'); // 192.168.0.0/16
 Parser::ip('1.2.3.4:80', ParseFlags::STRICT); // throws in strict mode
 ```
 
-### Database-Backed Range Lookup (RFC-0005)
+### Database-Backed Range Lookup
 
 This module is optional. If you do not need database-backed lookups, you can skip this entire section and continue using the in-memory IP/Network/Range features.
 
@@ -295,7 +297,7 @@ echo (string)Network::parse('192.0.0.1/8')->netmask; // 255.0.0.0
 echo (string)Network::parse('192.0.0.1'); // 192.0.0.1/32
 ```
 
-**Convenience helpers (RFC-0007):**
+**Convenience helpers:**
 
 ```php
 $network = Network::parse('192.0.2.130/24');
@@ -508,7 +510,7 @@ foreach ($range->iterateNetworks() as $network) {
 }
 ```
 
-### RangeSet Algebra (RFC-0006)
+### RangeSet Algebra
 
 ```php
 use IPTools\IP;
