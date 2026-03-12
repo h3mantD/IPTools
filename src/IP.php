@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use IPTools\Exception\IpException;
 use OverflowException;
 use Stringable;
+use Throwable;
 
 /**
  * @author Safarov Alisher <alisher.safarov@outlook.com>
@@ -29,6 +30,10 @@ class IP implements Stringable
     public const IP_V4_OCTETS = 4;
 
     public const IP_V6_OCTETS = 16;
+
+    public const IP_V4_MAX_LONG = '4294967295';
+
+    public const IP_V6_MAX_LONG = '340282366920938463463374607431768211455';
 
     private string $in_addr;
 
@@ -114,16 +119,28 @@ class IP implements Stringable
         return new self($ip);
     }
 
+    /**
+     * @throws IpException
+     */
     public static function parseLong(int|string $longIP, string $version = self::IP_V4): self
     {
-        if ($version === self::IP_V4) {
-            $ip = long2ip((int) $longIP) ?: '';
-
-            return new self($ip);
+        if (! in_array($version, [self::IP_V4, self::IP_V6], true)) {
+            throw new IpException('Wrong IP version');
         }
-        $binary = [];
+
         $longIP = (string) $longIP;
-        for ($i = 0; $i < self::IP_V6_OCTETS; $i++) {
+        if (! preg_match('/^-?\d+$/', $longIP)) {
+            throw new IpException('Invalid long IP address format');
+        }
+        /** @var numeric-string $longIP */
+        $max = $version === self::IP_V4 ? self::IP_V4_MAX_LONG : self::IP_V6_MAX_LONG;
+        if (bccomp($longIP, '0') < 0 || bccomp($longIP, $max) > 0) {
+            throw new IpException('Long IP address is out of range');
+        }
+
+        $binary = [];
+        $octets = $version === self::IP_V4 ? self::IP_V4_OCTETS : self::IP_V6_OCTETS;
+        for ($i = 0; $i < $octets; $i++) {
             $binary[] = (int) bcmod($longIP, '256');
             $longIP = bcdiv($longIP, '256', 0);
         }
@@ -144,6 +161,88 @@ class IP implements Stringable
         }
 
         return new self($ip);
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function toIpv4Mapped(self $ipv4): self
+    {
+        if ($ipv4->getVersion() !== self::IP_V4) {
+            throw new InvalidArgumentException('Expected an IPv4 address');
+        }
+
+        return self::parseInAddr(str_repeat("\x00", 10)."\xff\xff".$ipv4->inAddr());
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function fromIpv4Mapped(self|string $ipv6): self
+    {
+        $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
+        if ($ip->getVersion() !== self::IP_V6 || ! $ip->isIpv4Mapped()) {
+            throw new InvalidArgumentException('Address is not an IPv4-mapped IPv6 address');
+        }
+
+        return self::parseInAddr(substr($ip->inAddr(), 12, self::IP_V4_OCTETS));
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function to6to4(self $ipv4): self
+    {
+        if ($ipv4->getVersion() !== self::IP_V4) {
+            throw new InvalidArgumentException('Expected an IPv4 address');
+        }
+
+        return self::parseInAddr("\x20\x02".$ipv4->inAddr().str_repeat("\x00", 10));
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function from6to4(self|string $ipv6): self
+    {
+        $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
+        if ($ip->getVersion() !== self::IP_V6 || ! $ip->is6to4()) {
+            throw new InvalidArgumentException('Address is not a 6to4 IPv6 address');
+        }
+
+        return self::parseInAddr(substr($ip->inAddr(), 2, self::IP_V4_OCTETS));
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function toNat64(self $ipv4, string $prefix = '64:ff9b::/96'): self
+    {
+        if ($ipv4->getVersion() !== self::IP_V4) {
+            throw new InvalidArgumentException('Expected an IPv4 address');
+        }
+
+        $network = self::parseNat64Prefix($prefix);
+
+        return self::parseInAddr(substr($network->getNetwork()->inAddr(), 0, 12).$ipv4->inAddr());
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public static function fromNat64(self|string $ipv6, string $prefix = '64:ff9b::/96'): self
+    {
+        $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
+        if ($ip->getVersion() !== self::IP_V6) {
+            throw new InvalidArgumentException('Expected an IPv6 address');
+        }
+
+        $network = self::parseNat64Prefix($prefix);
+        if (! self::ipInNetwork($ip, $network)) {
+            throw new InvalidArgumentException('Address is not within the NAT64 prefix');
+        }
+
+        return self::parseInAddr(substr($ip->inAddr(), 12, self::IP_V4_OCTETS));
     }
 
     public function getVersion(): string
@@ -324,6 +423,38 @@ class IP implements Stringable
         return $this->is(IPType::RESERVED);
     }
 
+    public function isIpv4Mapped(): bool
+    {
+        if ($this->getVersion() !== self::IP_V6) {
+            return false;
+        }
+
+        return str_starts_with($this->in_addr, str_repeat("\x00", 10)."\xff\xff");
+    }
+
+    public function is6to4(): bool
+    {
+        if ($this->getVersion() !== self::IP_V6) {
+            return false;
+        }
+
+        return str_starts_with($this->in_addr, "\x20\x02");
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    public function isNat64(string $prefix = '64:ff9b::/96'): bool
+    {
+        if ($this->getVersion() !== self::IP_V6) {
+            return false;
+        }
+
+        $network = self::parseNat64Prefix($prefix);
+
+        return self::ipInNetwork($this, $network);
+    }
+
     // -------------------------------------------------------------------------
     // IP Arithmetic and Offset Operations
     // -------------------------------------------------------------------------
@@ -364,7 +495,6 @@ class IP implements Stringable
      * Add a signed integer offset to this address.
      *
      * @throws OverflowException when mode is THROW and result is out of range
-     * @throws InvalidArgumentException when steps is negative
      */
     public function addOffset(int|string $delta, OverflowMode $mode = OverflowMode::THROW): ?self
     {
@@ -399,7 +529,7 @@ class IP implements Stringable
     /**
      * Return the address $steps ahead. Returns null at the address-space boundary.
      *
-     * @throws InvalidArgumentException if steps is negative
+     * @throws IpException if steps is negative
      */
     public function next(int|string $steps = 1): ?self
     {
@@ -415,7 +545,7 @@ class IP implements Stringable
     /**
      * Return the address $steps behind. Returns null at the address-space boundary.
      *
-     * @throws InvalidArgumentException if steps is negative
+     * @throws IpException if steps is negative
      */
     public function previous(int|string $steps = 1): ?self
     {
@@ -471,6 +601,34 @@ class IP implements Stringable
         return self::parseLong($result, $this->getVersion());
     }
 
+    /**
+     * @throws InvalidArgumentException
+     */
+    private static function parseNat64Prefix(string $prefix): Network
+    {
+        try {
+            $network = Network::parse($prefix);
+        } catch (Throwable $throwable) {
+            throw new InvalidArgumentException('Invalid NAT64 prefix', 0, $throwable);
+        }
+
+        if ($network->getIP()->getVersion() !== self::IP_V6 || $network->getPrefixLength() !== 96) {
+            throw new InvalidArgumentException('NAT64 prefix must be an IPv6 /96 network');
+        }
+
+        return $network;
+    }
+
+    private static function ipInNetwork(self $ip, Network $network): bool
+    {
+        if ($ip->getVersion() !== $network->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($ip->inAddr(), $network->getFirstIP()->inAddr()) >= 0
+            && strcmp($ip->inAddr(), $network->getLastIP()->inAddr()) <= 0;
+    }
+
     // -------------------------------------------------------------------------
 
     /**
@@ -481,8 +639,8 @@ class IP implements Stringable
     private function maxLong(): string
     {
         return $this->getVersion() === self::IP_V4
-            ? '4294967295'
-            : '340282366920938463463374607431768211455';
+            ? self::IP_V4_MAX_LONG
+            : self::IP_V6_MAX_LONG;
     }
 
     /**

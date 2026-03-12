@@ -87,6 +87,59 @@ echo IP::parse('192.0.2.5')->reversePointer; // 5.2.0.192.in-addr.arpa
 echo IP::parse('2001:db8::567:89ab')->reversePointer; // b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa
 ```
 
+### IP Type Classification (RFC-0001)
+
+```php
+$ip = new IP('127.0.0.1');
+
+echo $ip->primaryType()->value; // loopback
+var_dump($ip->isLoopback()); // true
+var_dump($ip->isGlobalRoutable()); // false
+
+$types = (new IP('233.252.0.1'))->types();
+// MULTICAST + DOCUMENTATION (precedence keeps MULTICAST as primary)
+```
+
+### IP Arithmetic and Offsets (RFC-0002)
+
+```php
+$ip = new IP('0.0.0.1');
+
+echo (string) $ip->next(); // 0.0.0.2
+echo (string) $ip->previous(); // 0.0.0.0
+echo (string) $ip->addOffset(10); // 0.0.0.11
+echo (string) $ip->shift(-1); // 0.0.0.2 (left shift by 1)
+
+$distance = (new IP('10.0.0.1'))->distanceTo(new IP('10.0.0.10'));
+echo $distance; // 9
+```
+
+```php
+use IPTools\OverflowMode;
+
+$max = new IP('255.255.255.255');
+
+var_dump($max->next()); // null (boundary-safe convenience)
+echo (string) $max->addOffset(1, OverflowMode::WRAP); // 0.0.0.0
+echo (string) $max->addOffset(1, OverflowMode::CLAMP); // 255.255.255.255
+```
+
+### IPv4 <-> IPv6 Conversions (RFC-0003)
+
+```php
+// IPv4-mapped
+$mapped = IP::toIpv4Mapped(new IP('127.0.0.1')); // ::ffff:127.0.0.1
+echo (string) IP::fromIpv4Mapped($mapped); // 127.0.0.1
+
+// 6to4
+$sixToFour = IP::to6to4(new IP('10.0.0.1')); // 2002:a00:1::
+echo (string) IP::from6to4($sixToFour); // 10.0.0.1
+
+// NAT64 /96 (default 64:ff9b::/96)
+$nat64 = IP::toNat64(new IP('8.8.8.8')); // 64:ff9b::808:808
+echo (string) IP::fromNat64($nat64); // 8.8.8.8
+```
+
 ### Network Operations
 
 ```php

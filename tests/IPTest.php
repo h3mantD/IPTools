@@ -127,7 +127,9 @@ final class IPTest extends TestCase
     {
         $this->expectException(TypeError::class);
 
-        new IP(123.45); // @phpstan-ignore argument.type
+        /** @var mixed $value */
+        $value = 123.45;
+        new IP($value);
     }
 
     public function test_properties(): void
@@ -193,6 +195,30 @@ final class IPTest extends TestCase
 
         $this->assertEquals('ffff::', (string) $ipv6);
         $this->assertEquals($ipv6Long, $ipv6->toLong());
+    }
+
+    public function test_parse_long_out_of_range_ipv4_throws(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Long IP address is out of range');
+
+        IP::parseLong('4294967296');
+    }
+
+    public function test_parse_long_out_of_range_ipv6_throws(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Long IP address is out of range');
+
+        IP::parseLong('340282366920938463463374607431768211456', IP::IP_V6);
+    }
+
+    public function test_parse_long_invalid_version_throws(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Wrong IP version');
+
+        IP::parseLong('1', 'invalid-version');
     }
 
     public function test_parse_hex(): void

@@ -291,8 +291,9 @@ class Network implements Countable, Iterator, Stringable
         $exclude = self::parse($exclude);
         $ip = $this->getIP();
 
-        if (strcmp($exclude->getFirstIP()->inAddr(), $this->getLastIP()->inAddr()) > 0
-            || strcmp($exclude->getLastIP()->inAddr(), $this->getFirstIP()->inAddr()) < 0
+        if ($exclude->getIP()->getVersion() !== $ip->getVersion()
+            || strcmp($exclude->getFirstIP()->inAddr(), $this->getFirstIP()->inAddr()) < 0
+            || strcmp($exclude->getLastIP()->inAddr(), $this->getLastIP()->inAddr()) > 0
         ) {
             throw new NetworkException('Exclude subnet not within target network');
         }
