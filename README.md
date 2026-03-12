@@ -479,6 +479,35 @@ foreach ($range->iterateNetworks() as $network) {
 }
 ```
 
+### RangeSet Algebra (RFC-0006)
+
+```php
+use IPTools\IP;
+use IPTools\RangeSet;
+
+$set = new RangeSet([
+    '10.0.0.0-10.0.0.10',
+    '10.0.0.11-10.0.0.20',
+]);
+
+// Canonicalized automatically: adjacent ranges are merged
+var_dump(count($set)); // 1
+
+$other = new RangeSet(['10.0.0.5-10.0.0.15']);
+
+$intersection = $set->intersect($other);
+$difference = $set->subtract($other);
+$union = $set->union('10.0.0.50-10.0.0.60');
+
+var_dump($set->contains(new IP('10.0.0.8'))); // true
+var_dump($set->containsRange('10.0.0.1-10.0.0.3')); // true
+var_dump($set->overlaps('10.0.0.18-10.0.1.1')); // true
+
+foreach ($difference->toCidrs() as $network) {
+    echo (string) $network . PHP_EOL;
+}
+```
+
 # License
 
 The library is released under the [MIT](https://opensource.org/licenses/MIT).
