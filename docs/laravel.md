@@ -93,6 +93,7 @@ This is the recommended approach for app-level code because it respects package 
 ## Direct Adapter Usage
 
 ```php
+use Illuminate\Support\Facades\DB;
 use IPTools\Storage\LaravelRangeStorage;
 
 $storage = new LaravelRangeStorage(DB::connection(), 'ip_ranges');

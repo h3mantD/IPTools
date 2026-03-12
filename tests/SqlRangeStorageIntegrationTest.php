@@ -34,6 +34,10 @@ final class SqlRangeStorageIntegrationTest extends TestCase
 
         $matches = iterator_to_array($storage->findContaining(new IP('10.10.1.10')), false);
         $this->assertCount(1, $matches);
+        $this->assertArrayHasKey('range', $matches[0]);
+        $this->assertInstanceOf(Range::class, $matches[0]['range']);
+        $this->assertSame('10.10.1.0', (string) $matches[0]['range']->getFirstIP());
+        $this->assertSame('10.10.1.15', (string) $matches[0]['range']->getLastIP());
         $this->assertSame(self::MYSQL, $matches[0]['metadata']['engine'] ?? null);
         $this->assertSame(20, $matches[0]['metadata']['priority'] ?? null);
     }
@@ -91,14 +95,14 @@ final class SqlRangeStorageIntegrationTest extends TestCase
     private function enginePass(string $engine): string
     {
         if ($engine === self::MYSQL) {
-            $pass = getenv('IPTOOLS_MYSQL_PASSWORD');
-
-            return is_string($pass) ? $pass : 'root';
+            return getenv('IPTOOLS_MYSQL_PASSWORD') !== false
+                ? (string) getenv('IPTOOLS_MYSQL_PASSWORD')
+                : 'root';
         }
 
-        $pass = getenv('IPTOOLS_PGSQL_PASSWORD');
-
-        return is_string($pass) ? $pass : 'postgres';
+        return getenv('IPTOOLS_PGSQL_PASSWORD') !== false
+            ? (string) getenv('IPTOOLS_PGSQL_PASSWORD')
+            : 'postgres';
     }
 
     private function connect(string $engine): ?PDO

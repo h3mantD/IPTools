@@ -81,6 +81,20 @@ final class IPTypeTest extends TestCase
         $this->assertFalse($ip->isPrivate());
     }
 
+    public function test_ipv4_ietf_anycast_addresses_are_global(): void
+    {
+        $pcp = new IP('192.0.0.9');
+        $turn = new IP('192.0.0.10');
+        $special = new IP('192.0.0.11');
+
+        $this->assertSame(IPType::GLOBAL, $pcp->primaryType());
+        $this->assertSame(IPType::GLOBAL, $turn->primaryType());
+        $this->assertSame(IPType::RESERVED, $special->primaryType());
+        $this->assertTrue($pcp->isGlobalRoutable());
+        $this->assertTrue($turn->isGlobalRoutable());
+        $this->assertFalse($special->isGlobalRoutable());
+    }
+
     public function test_ipv4_private10(): void
     {
         $ip = new IP('10.0.0.1');

@@ -10,6 +10,8 @@ class IpRange extends Model
 {
     protected $table = 'ip_ranges';
 
+    public $timestamps = false;
+
     protected $guarded = [];
 
     protected $casts = [

@@ -74,13 +74,14 @@ final class SqlRangeStorage implements RangeStorageInterface
 
         $statement = $this->pdo->prepare(
             sprintf(
-                'SELECT 1 FROM %s WHERE version = :version AND start_bin <= :addr_bin AND end_bin >= :addr_bin LIMIT 1',
+                'SELECT 1 FROM %s WHERE version = :version AND start_bin <= :addr_bin_start AND end_bin >= :addr_bin_end LIMIT 1',
                 $this->table
             )
         );
 
         $statement->bindValue(':version', $version, PDO::PARAM_INT);
-        $statement->bindValue(':addr_bin', $encoded, PDO::PARAM_LOB);
+        $statement->bindValue(':addr_bin_start', $encoded, PDO::PARAM_LOB);
+        $statement->bindValue(':addr_bin_end', $encoded, PDO::PARAM_LOB);
         $statement->execute();
 
         return $statement->fetchColumn() !== false;
@@ -133,7 +134,11 @@ final class SqlRangeStorage implements RangeStorageInterface
     {
         $this->ensureTableExists();
         $statement = $this->pdo->query(sprintf('SELECT COUNT(*) FROM %s', $this->table));
-        $count = $statement === false ? false : $statement->fetchColumn();
+        if ($statement === false) {
+            throw new RuntimeException(sprintf('Failed to execute count query on table "%s"', $this->table));
+        }
+
+        $count = $statement->fetchColumn();
 
         return $count === false ? 0 : (int) $count;
     }

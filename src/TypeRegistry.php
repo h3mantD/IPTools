@@ -78,7 +78,16 @@ final class TypeRegistry
             [IPType::PRIVATE, '192.168.0.0/16'],
             // RESERVED
             [IPType::RESERVED, '0.0.0.0/8'],              // "This" Network
-            [IPType::RESERVED, '192.0.0.0/24'],            // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.0/29'],            // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.8/32'],            // IPv4 dummy address
+            [IPType::GLOBAL, '192.0.0.9/32'],              // PCP Anycast (globally reachable)
+            [IPType::GLOBAL, '192.0.0.10/32'],             // TURN Anycast (globally reachable)
+            [IPType::RESERVED, '192.0.0.11/32'],           // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.12/30'],           // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.16/28'],           // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.32/27'],           // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.64/26'],           // IETF Protocol Assignments
+            [IPType::RESERVED, '192.0.0.128/25'],          // IETF Protocol Assignments
             [IPType::RESERVED, '192.88.99.0/24'],          // Formerly 6to4 Relay Anycast
             [IPType::RESERVED, '240.0.0.0/4'],             // Reserved
         ]);

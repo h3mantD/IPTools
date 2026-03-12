@@ -6,6 +6,7 @@ namespace IPTools;
 
 use Countable;
 use Generator;
+use InvalidArgumentException;
 use IPTools\Exception\RangeException;
 use Iterator;
 use OutOfBoundsException;
@@ -208,20 +209,24 @@ class Range implements Countable, Iterator
      */
     public function addressAt(int|string $offset): ?IP
     {
-        /** @var numeric-string $offset */
         $offset = (string) $offset;
+        if (preg_match('/^-?\d+$/', $offset) !== 1) {
+            throw new InvalidArgumentException('Offset must be an integer string');
+        }
+
+        /** @var numeric-string $offset */
         $firstLong = $this->getFirstIP()->toLong();
         $lastLong = $this->getLastIP()->toLong();
         $version = $this->getFirstIP()->getVersion();
 
-        if (bccomp($offset, '0') >= 0) {
-            $result = bcadd($firstLong, $offset);
-            if (bccomp($result, $lastLong) > 0) {
+        if (bccomp($offset, '0', 0) >= 0) {
+            $result = bcadd($firstLong, $offset, 0);
+            if (bccomp($result, $lastLong, 0) > 0) {
                 return null;
             }
         } else {
-            $result = bcadd(bcadd($lastLong, '1'), $offset);
-            if (bccomp($result, $firstLong) < 0) {
+            $result = bcadd(bcadd($lastLong, '1', 0), $offset, 0);
+            if (bccomp($result, $firstLong, 0) < 0) {
                 return null;
             }
         }

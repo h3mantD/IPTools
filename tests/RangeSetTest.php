@@ -71,6 +71,7 @@ final class RangeSetTest extends TestCase
 
         $subtracted = $set->subtract('10.0.0.0/25');
         $this->assertFalse($subtracted->contains(new IP('10.0.0.42')));
+        $this->assertTrue($subtracted->contains(new IP('10.0.0.200')));
         $this->assertTrue($subtracted->contains(new IP('2001:db8::2')));
     }
 

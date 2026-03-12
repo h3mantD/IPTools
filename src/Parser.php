@@ -131,11 +131,19 @@ final class Parser
             && preg_match('/^\d+\.\d+$/', $address) === 1
         ) {
             [$first, $last] = explode('.', $address, 2);
-            if ((int) $first < 0 || (int) $first > 255 || (int) $last < 0 || (int) $last > 255) {
+
+            $firstPart = filter_var($first, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 0, 'max_range' => 255],
+            ]);
+            $lastPart = filter_var($last, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 0, 'max_range' => 255],
+            ]);
+
+            if ($firstPart === false || $lastPart === false) {
                 throw new IpException('Invalid non-quad IPv4 format');
             }
 
-            return new IP(sprintf('%d.0.0.%d', (int) $first, (int) $last));
+            return new IP(sprintf('%d.0.0.%d', $firstPart, $lastPart));
         }
 
         return new IP($address);
@@ -221,6 +229,10 @@ final class Parser
     {
         if (! ctype_digit($port)) {
             throw new IpException('Invalid port format');
+        }
+
+        if (strlen($port) > 5) {
+            throw new IpException('Port must be in the range 0-65535');
         }
 
         $parsedPort = (int) $port;

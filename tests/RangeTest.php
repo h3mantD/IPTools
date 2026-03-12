@@ -230,4 +230,12 @@ final class RangeTest extends TestCase
 
         new Range(IP::parse('127.0.0.1'), IP::parse('2001:db8::1'));
     }
+
+    public function test_address_at_rejects_non_integer_offset(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Offset must be an integer string');
+
+        Range::parse('10.0.0.1-10.0.0.10')->addressAt('1.5');
+    }
 }

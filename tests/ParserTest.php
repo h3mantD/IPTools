@@ -44,10 +44,36 @@ final class ParserTest extends TestCase
         $this->assertSame('10.0.0.1', (string) Parser::ip('0o1200000001')->ip);
     }
 
-    public function test_strict_mode_disables_port_and_wildcards(): void
+    public function test_strict_mode_disables_port(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Invalid IP address format');
+
         Parser::ip('1.2.3.4:80', ParseFlags::STRICT);
+    }
+
+    public function test_strict_mode_disables_wildcards(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Wildcard parsing is not allowed');
+
+        Parser::range('192.168.*.*', ParseFlags::STRICT);
+    }
+
+    public function test_port_parser_rejects_overflowing_digit_sequence(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Port must be in the range 0-65535');
+
+        Parser::ip('1.2.3.4:1000000');
+    }
+
+    public function test_parsed_address_rejects_invalid_port(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('port must be null or between 0 and 65535');
+
+        new ParsedAddress(Parser::ip('10.0.0.1')->ip, 70000);
     }
 
     public function test_range_wildcard_aligned_returns_network(): void
