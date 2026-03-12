@@ -76,6 +76,7 @@ final class NetworkTest extends TestCase
         return [
             ['192.0.2.0/28', '192.0.3.0/24'],
             ['192.0.2.2/32', '192.0.2.3/32'],
+            ['192.0.2.0/28', '192.0.2.0/27'],
         ];
     }
 
@@ -388,5 +389,73 @@ final class NetworkTest extends TestCase
         }
 
         $this->assertSame($expected, $result);
+    }
+
+    public function test_network_helper_aliases(): void
+    {
+        $network = Network::parse('192.0.2.130/24');
+
+        $this->assertSame('192.0.2.0', (string) $network->networkAddress());
+        $this->assertSame('192.0.2.255', (string) $network->broadcastAddress());
+    }
+
+    public function test_host_boundaries_and_usable_counts_ipv4(): void
+    {
+        $normal = Network::parse('192.0.2.0/24');
+        $this->assertSame('192.0.2.1', (string) $normal->firstHost());
+        $this->assertSame('192.0.2.254', (string) $normal->lastHost());
+        $this->assertSame(254, $normal->usableHostCount());
+
+        $pointToPoint = Network::parse('192.0.2.0/31');
+        $this->assertTrue($pointToPoint->isPointToPoint());
+        $this->assertSame('192.0.2.0', (string) $pointToPoint->firstHost());
+        $this->assertSame('192.0.2.1', (string) $pointToPoint->lastHost());
+        $this->assertSame(2, $pointToPoint->usableHostCount());
+
+        $single = Network::parse('192.0.2.10/32');
+        $this->assertFalse($single->isPointToPoint());
+        $this->assertSame('192.0.2.10', (string) $single->firstHost());
+        $this->assertSame('192.0.2.10', (string) $single->lastHost());
+        $this->assertSame(1, $single->usableHostCount());
+    }
+
+    public function test_host_boundaries_and_usable_counts_ipv6(): void
+    {
+        $network = Network::parse('2001:db8::/126');
+        $this->assertSame('2001:db8::', (string) $network->firstHost());
+        $this->assertSame('2001:db8::3', (string) $network->lastHost());
+        $this->assertSame('4', (string) $network->usableHostCount());
+
+        $pointToPoint = Network::parse('2001:db8::/127');
+        $this->assertTrue($pointToPoint->isPointToPoint());
+    }
+
+    public function test_contains_helpers(): void
+    {
+        $network = Network::parse('10.0.0.0/24');
+
+        $this->assertTrue($network->containsIP('10.0.0.42'));
+        $this->assertFalse($network->containsIP('10.0.1.1'));
+
+        $this->assertTrue($network->containsRange('10.0.0.10-10.0.0.20'));
+        $this->assertTrue($network->containsRange(Network::parse('10.0.0.0/25')));
+        $this->assertFalse($network->containsRange('10.0.1.0/24'));
+        $this->assertFalse($network->containsRange('2001:db8::/64'));
+    }
+
+    public function test_next_previous_subnet(): void
+    {
+        $network = Network::parse('10.0.0.0/24');
+
+        $next = $network->nextSubnet();
+        $previous = $network->previousSubnet();
+
+        $this->assertInstanceOf(Network::class, $next);
+        $this->assertInstanceOf(Network::class, $previous);
+        $this->assertSame('10.0.1.0/24', (string) $next);
+        $this->assertSame('9.255.255.0/24', (string) $previous);
+
+        $this->assertNull(Network::parse('0.0.0.0/0')->previousSubnet());
+        $this->assertNull(Network::parse('255.255.255.0/24')->nextSubnet());
     }
 }

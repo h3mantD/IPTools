@@ -244,6 +244,148 @@ class Network implements Countable, Iterator, Stringable
         return new IP($broadcast);
     }
 
+    public function networkAddress(): IP
+    {
+        return $this->getNetwork();
+    }
+
+    public function broadcastAddress(): IP
+    {
+        return $this->getBroadcast();
+    }
+
+    public function firstHost(): IP
+    {
+        $network = $this->getNetwork();
+
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $network;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $network;
+        }
+
+        $host = $network->next();
+        if (! $host instanceof IP) {
+            throw new NetworkException('Unable to calculate first host address');
+        }
+
+        return $host;
+    }
+
+    public function lastHost(): IP
+    {
+        $broadcast = $this->getBroadcast();
+
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $broadcast;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $broadcast;
+        }
+
+        $host = $broadcast->previous();
+        if (! $host instanceof IP) {
+            throw new NetworkException('Unable to calculate last host address');
+        }
+
+        return $host;
+    }
+
+    /**
+     * Returns usable address count.
+     * IPv4 /31 and /32 are treated as fully usable.
+     * IPv6 has no broadcast reservation, so all addresses are usable.
+     */
+    public function usableHostCount(): string|int
+    {
+        $blockSize = $this->getBlockSize();
+        if ($this->getIP()->getVersion() === IP::IP_V6) {
+            return $blockSize;
+        }
+
+        if ($this->getPrefixLength() >= 31) {
+            return $blockSize;
+        }
+
+        if (is_int($blockSize)) {
+            return max(0, $blockSize - 2);
+        }
+
+        /** @var numeric-string $blockSize */
+
+        return bcsub($blockSize, '2');
+    }
+
+    public function isPointToPoint(): bool
+    {
+        if ($this->getIP()->getVersion() === IP::IP_V4 && $this->getPrefixLength() === 31) {
+            return true;
+        }
+
+        return $this->getIP()->getVersion() === IP::IP_V6 && $this->getPrefixLength() === 127;
+    }
+
+    public function containsIP(IP|string $ip): bool
+    {
+        $candidate = $ip instanceof IP ? $ip : IP::parse($ip);
+        if ($candidate->getVersion() !== $this->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($candidate->inAddr(), $this->getFirstIP()->inAddr()) >= 0
+            && strcmp($candidate->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+    }
+
+    public function containsRange(Range|self|IP|string $range): bool
+    {
+        if ($range instanceof self) {
+            $candidate = new Range($range->getFirstIP(), $range->getLastIP());
+        } elseif ($range instanceof Range) {
+            $candidate = $range;
+        } elseif ($range instanceof IP) {
+            $candidate = new Range($range, $range);
+        } else {
+            $candidate = Range::parse($range);
+        }
+
+        if ($candidate->getFirstIP()->getVersion() !== $this->getIP()->getVersion()) {
+            return false;
+        }
+
+        return strcmp($candidate->getFirstIP()->inAddr(), $this->getFirstIP()->inAddr()) >= 0
+            && strcmp($candidate->getLastIP()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
+    }
+
+    public function nextSubnet(): ?self
+    {
+        $step = (string) $this->getBlockSize();
+        /** @var numeric-string $step */
+        $version = $this->getIP()->getVersion();
+        $max = $version === IP::IP_V4 ? IP::IP_V4_MAX_LONG : IP::IP_V6_MAX_LONG;
+        $nextLong = bcadd($this->getNetwork()->toLong(), $step);
+        if (bccomp($nextLong, $max) > 0) {
+            return null;
+        }
+
+        return new self(IP::parseLong($nextLong, $version), $this->getNetmask());
+    }
+
+    public function previousSubnet(): ?self
+    {
+        $step = (string) $this->getBlockSize();
+        /** @var numeric-string $step */
+        $version = $this->getIP()->getVersion();
+        $prevLong = bcsub($this->getNetwork()->toLong(), $step);
+        if (bccomp($prevLong, '0') < 0) {
+            return null;
+        }
+
+        return new self(IP::parseLong($prevLong, $version), $this->getNetmask());
+    }
+
     public function getFirstIP(): IP
     {
         return $this->getNetwork();
@@ -291,8 +433,9 @@ class Network implements Countable, Iterator, Stringable
         $exclude = self::parse($exclude);
         $ip = $this->getIP();
 
-        if (strcmp($exclude->getFirstIP()->inAddr(), $this->getLastIP()->inAddr()) > 0
-            || strcmp($exclude->getLastIP()->inAddr(), $this->getFirstIP()->inAddr()) < 0
+        if ($exclude->getIP()->getVersion() !== $ip->getVersion()
+            || strcmp($exclude->getFirstIP()->inAddr(), $this->getFirstIP()->inAddr()) < 0
+            || strcmp($exclude->getLastIP()->inAddr(), $this->getLastIP()->inAddr()) > 0
         ) {
             throw new NetworkException('Exclude subnet not within target network');
         }
@@ -308,7 +451,12 @@ class Network implements Countable, Iterator, Stringable
         $lower->setPrefixLength($newPrefixLength);
 
         $upper = clone $lower;
-        $upper->setIP($lower->getLastIP()->next());
+        $upperFirstIP = $lower->getLastIP()->next();
+        if (! $upperFirstIP instanceof IP) {
+            return $networks;
+        }
+
+        $upper->setIP($upperFirstIP);
 
         while ($newPrefixLength <= $exclude->getPrefixLength()) {
             $range = new Range($lower->getFirstIP(), $lower->getLastIP());
@@ -328,7 +476,12 @@ class Network implements Countable, Iterator, Stringable
 
             $matched->setPrefixLength($newPrefixLength);
             $unmatched->setPrefixLength($newPrefixLength);
-            $unmatched->setIP($matched->getLastIP()->next());
+            $nextIP = $matched->getLastIP()->next();
+            if (! $nextIP instanceof IP) {
+                break;
+            }
+
+            $unmatched->setIP($nextIP);
         }
 
         usort($networks, static fn (self $a, self $b): int => strcmp($a->getFirstIP()->inAddr(), $b->getFirstIP()->inAddr()));
@@ -366,7 +519,7 @@ class Network implements Countable, Iterator, Stringable
             $networks[] = $subnet;
 
             $nextIP = $subnet->getLastIP()->next();
-            if (strcmp($nextIP->inAddr(), $subnet->getFirstIP()->inAddr()) <= 0) {
+            if (! $nextIP instanceof IP) {
                 break;
             }
 
@@ -379,7 +532,12 @@ class Network implements Countable, Iterator, Stringable
     public function current(): IP
     {
         if (! $this->currentIP instanceof IP) {
-            $this->currentIP = $this->getFirstIP()->next($this->position);
+            $ip = $this->getFirstIP()->next($this->position);
+            if (! $ip instanceof IP) {
+                throw new NetworkException('Iterator position is out of range');
+            }
+
+            $this->currentIP = $ip;
         }
 
         return $this->currentIP;
@@ -395,7 +553,7 @@ class Network implements Countable, Iterator, Stringable
         $this->position++;
 
         if ($this->currentIP instanceof IP) {
-            $this->currentIP = $this->currentIP->next();
+            $this->currentIP = $this->currentIP->next(); // ?IP; null signals boundary
         }
     }
 
@@ -407,6 +565,11 @@ class Network implements Countable, Iterator, Stringable
 
     public function valid(): bool
     {
+        // next() set currentIP to null when the address-space boundary was reached
+        if (! $this->currentIP instanceof IP && $this->position > 0) {
+            return false;
+        }
+
         return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 
@@ -462,7 +625,12 @@ class Network implements Countable, Iterator, Stringable
             return null;
         }
 
-        if (strcmp($left->getLastIP()->next()->inAddr(), $right->getFirstIP()->inAddr()) !== 0) {
+        $nextAfterLeft = $left->getLastIP()->next();
+        if (! $nextAfterLeft instanceof IP) {
+            return null;
+        }
+
+        if (strcmp($nextAfterLeft->inAddr(), $right->getFirstIP()->inAddr()) !== 0) {
             return null;
         }
 

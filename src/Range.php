@@ -6,8 +6,10 @@ namespace IPTools;
 
 use Countable;
 use Generator;
+use InvalidArgumentException;
 use IPTools\Exception\RangeException;
 use Iterator;
+use OutOfBoundsException;
 
 /**
  * @author Safarov Alisher <alisher.safarov@outlook.com>
@@ -143,7 +145,7 @@ class Range implements Countable, Iterator
             yield $network;
 
             $nextIP = $network->getLastIP()->next();
-            if (strcmp($nextIP->inAddr(), $currentIP->inAddr()) <= 0) {
+            if (! $nextIP instanceof IP) {
                 break;
             }
 
@@ -200,10 +202,69 @@ class Range implements Countable, Iterator
         return new Network($ip, Network::prefix2netmask($prefixLength, $ip->getVersion()));
     }
 
+    /**
+     * Address at a 0-based offset from the range start.
+     * Negative offsets count from the end (-1 is the last address).
+     * Returns null if offset is outside the range.
+     */
+    public function addressAt(int|string $offset): ?IP
+    {
+        $offset = (string) $offset;
+        if (preg_match('/^-?\d+$/', $offset) !== 1) {
+            throw new InvalidArgumentException('Offset must be an integer string');
+        }
+
+        /** @var numeric-string $offset */
+        $firstLong = $this->getFirstIP()->toLong();
+        $lastLong = $this->getLastIP()->toLong();
+        $version = $this->getFirstIP()->getVersion();
+
+        if (bccomp($offset, '0', 0) >= 0) {
+            $result = bcadd($firstLong, $offset, 0);
+            if (bccomp($result, $lastLong, 0) > 0) {
+                return null;
+            }
+        } else {
+            $result = bcadd(bcadd($lastLong, '1', 0), $offset, 0);
+            if (bccomp($result, $firstLong, 0) < 0) {
+                return null;
+            }
+        }
+
+        return IP::parseLong($result, $version);
+    }
+
+    /**
+     * Like addressAt() but throws \OutOfBoundsException when offset is outside the range.
+     *
+     * @throws OutOfBoundsException
+     */
+    public function addressAtOrFail(int|string $offset): IP
+    {
+        $ip = $this->addressAt($offset);
+        if (! $ip instanceof IP) {
+            throw new OutOfBoundsException(
+                sprintf(
+                    'Offset %s is outside the range [%s, %s]',
+                    $offset,
+                    $this->getFirstIP(),
+                    $this->getLastIP()
+                )
+            );
+        }
+
+        return $ip;
+    }
+
     public function current(): IP
     {
         if (! $this->currentIP instanceof IP) {
-            $this->currentIP = $this->getFirstIP()->next($this->position);
+            $ip = $this->getFirstIP()->next($this->position);
+            if (! $ip instanceof IP) {
+                throw new RangeException('Iterator position is out of range');
+            }
+
+            $this->currentIP = $ip;
         }
 
         return $this->currentIP;
@@ -219,7 +280,7 @@ class Range implements Countable, Iterator
         $this->position++;
 
         if ($this->currentIP instanceof IP) {
-            $this->currentIP = $this->currentIP->next();
+            $this->currentIP = $this->currentIP->next(); // ?IP; null signals boundary
         }
     }
 
@@ -231,6 +292,11 @@ class Range implements Countable, Iterator
 
     public function valid(): bool
     {
+        // next() set currentIP to null when the address-space boundary was reached
+        if (! $this->currentIP instanceof IP && $this->position > 0) {
+            return false;
+        }
+
         return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
     }
 

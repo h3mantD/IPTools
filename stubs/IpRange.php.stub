@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class IpRange extends Model
+{
+    protected $table = 'ip_ranges';
+
+    public $timestamps = false;
+
+    protected $guarded = [];
+
+    protected $casts = [
+        'version' => 'integer',
+        'metadata' => 'array',
+    ];
+}

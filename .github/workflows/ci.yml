@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches:
@@ -19,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.36.0
         with:
           php-version: ${{ matrix.php }}
           extensions: bcmath
@@ -40,10 +43,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.36.0
         with:
           php-version: '8.2'
           extensions: bcmath
@@ -61,10 +64,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.36.0
         with:
           php-version: '8.4'
           extensions: bcmath
@@ -82,3 +85,56 @@ jobs:
       - name: Run Rector
         run: ./vendor/bin/rector process --dry-run
 
+  db-integration:
+    name: DB integration (MySQL + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: iptools_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: iptools_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      IPTOOLS_MYSQL_DSN: mysql:host=127.0.0.1;port=3306;dbname=iptools_test;charset=utf8mb4
+      IPTOOLS_MYSQL_USER: root
+      IPTOOLS_MYSQL_PASSWORD: root
+      IPTOOLS_PGSQL_DSN: pgsql:host=127.0.0.1;port=5432;dbname=iptools_test
+      IPTOOLS_PGSQL_USER: postgres
+      IPTOOLS_PGSQL_PASSWORD: postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.36.0
+        with:
+          php-version: '8.4'
+          extensions: bcmath, pdo_mysql, pdo_pgsql
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+
+      - name: Run DB integration tests
+        run: ./vendor/bin/phpunit tests/SqlRangeStorageIntegrationTest.php --no-coverage
