@@ -10,6 +10,14 @@ Primary classes:
 - `IPTools\Storage\LaravelRangeStorage`
 - `IPTools\Models\IpRange`
 
+## Quick Start
+
+1. Install the package.
+2. Publish config and migration.
+3. Run migrations.
+4. Resolve `RangeStorageInterface` from the container.
+5. Start storing and querying ranges.
+
 ## Dependency Model
 
 - Laravel applications already include Illuminate components via `laravel/framework`.
@@ -20,6 +28,8 @@ Primary classes:
 composer require illuminate/support illuminate/database
 ```
 
+In a standard Laravel app, you usually do not need to install these manually.
+
 ## Service Provider
 
 Provider responsibilities:
@@ -29,6 +39,8 @@ Provider responsibilities:
 - publishes package assets
 
 Auto-discovery is configured in `composer.json`.
+
+If you disable package auto-discovery, register `IPTools\IPToolsServiceProvider` manually.
 
 ## Publishable Assets
 
@@ -45,6 +57,8 @@ php artisan vendor:publish --tag=iptools-model
 php artisan migrate
 ```
 
+You can publish only what you need. For example, if you prefer your own model, skip `iptools-model`.
+
 ## Config
 
 ```php
@@ -55,6 +69,11 @@ return [
     ],
 ];
 ```
+
+Config keys:
+
+- `iptools.storage.connection` - Laravel DB connection name (nullable)
+- `iptools.storage.table` - table name used by storage adapters
 
 ## Usage via Container
 
@@ -69,6 +88,8 @@ $storage->store(Network::parse('10.0.0.0/24'), ['policy' => 'allow']);
 var_dump($storage->contains(new IP('10.0.0.42')));
 ```
 
+This is the recommended approach for app-level code because it respects package config and container wiring.
+
 ## Direct Adapter Usage
 
 ```php
@@ -76,6 +97,8 @@ use IPTools\Storage\LaravelRangeStorage;
 
 $storage = new LaravelRangeStorage(DB::connection(), 'ip_ranges');
 ```
+
+Use this when you want explicit control over connection/table at call-site.
 
 ## Model
 
@@ -85,4 +108,35 @@ $storage = new LaravelRangeStorage(DB::connection(), 'ip_ranges');
 use App\Models\IpRange;
 
 $rows = IpRange::query()->where('version', 4)->limit(20)->get();
+```
+
+The model is optional and mainly useful for admin/reporting tools.
+
+## Troubleshooting
+
+### "Table is not available" runtime error
+
+Cause: migration was not published or run.
+
+Fix:
+
+```bash
+php artisan vendor:publish --tag=iptools-migrations
+php artisan migrate
+```
+
+### Nothing resolves for `RangeStorageInterface`
+
+Cause: provider not loaded.
+
+Fix: ensure package auto-discovery is enabled or register `IPTools\IPToolsServiceProvider` manually.
+
+### Wrong database/table used
+
+Cause: config mismatch.
+
+Fix: verify `IPTOOLS_DB_CONNECTION` and `IPTOOLS_RANGES_TABLE`, then clear config cache:
+
+```bash
+php artisan config:clear
 ```
