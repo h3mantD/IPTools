@@ -37,8 +37,6 @@ If you prefer to jump straight to method signatures, start with [API Reference](
   - Container and adapter usage
 - [API Reference](api-reference.md)
   - Public classes and methods in one place
-- [Package Tracker](package-tracker.md)
-  - Validated bug/DX follow-up list
 
 ## Suggested Learning Path
 

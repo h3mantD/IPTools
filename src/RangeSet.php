@@ -228,12 +228,13 @@ final class RangeSet implements Countable
 
         $normalized = [];
         foreach ($ranges as $range) {
-            $last = $normalized[count($normalized) - 1] ?? null;
-            if (! $last instanceof Range) {
+            if ($normalized === []) {
                 $normalized[] = $range;
 
                 continue;
             }
+
+            $last = $normalized[count($normalized) - 1];
 
             if (! $this->touchesOrOverlaps($last, $range)) {
                 $normalized[] = $range;
