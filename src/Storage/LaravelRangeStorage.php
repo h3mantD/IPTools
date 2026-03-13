@@ -8,9 +8,12 @@ use Illuminate\Database\Connection;
 use IPTools\IP;
 use IPTools\Network;
 use IPTools\Range;
+use PDO;
 
 final class LaravelRangeStorage implements RangeStorageInterface
 {
+    private ?PDO $pdo = null;
+
     private ?SqlRangeStorage $storage = null;
 
     public function __construct(
@@ -51,8 +54,11 @@ final class LaravelRangeStorage implements RangeStorageInterface
 
     private function storage(): SqlRangeStorage
     {
-        if (! $this->storage instanceof SqlRangeStorage) {
-            $this->storage = new SqlRangeStorage($this->connection->getPdo(), $this->table);
+        $pdo = $this->connection->getPdo();
+
+        if (! $this->storage instanceof SqlRangeStorage || $this->pdo !== $pdo) {
+            $this->pdo = $pdo;
+            $this->storage = new SqlRangeStorage($pdo, $this->table);
         }
 
         return $this->storage;

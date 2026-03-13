@@ -8,7 +8,6 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
-use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use IPTools\Console\InstallCommand;
 use IPTools\Storage\LaravelRangeStorage;
@@ -49,15 +48,14 @@ final class IPToolsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $configPath = $this->resolveConfigPath();
-        $migrationPath = $this->resolveMigrationPath();
         $modelPath = $this->resolveModelPath();
 
         $this->publishes([
             __DIR__.'/../config/iptools.php' => $configPath,
         ], 'iptools-config');
 
-        $this->publishes([
-            __DIR__.'/../database/migrations/create_ip_ranges_table.php.stub' => $migrationPath,
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => $this->app->databasePath('migrations'),
         ], 'iptools-migrations');
 
         $this->publishes([
@@ -74,21 +72,6 @@ final class IPToolsServiceProvider extends ServiceProvider
     private function resolveConfigPath(): string
     {
         return $this->app->configPath('iptools.php');
-    }
-
-    private function resolveMigrationPath(): string
-    {
-        $existing = glob((string) $this->app->databasePath('migrations/*_create_ip_ranges_table.php'));
-        if (is_array($existing) && $existing !== []) {
-            $first = Arr::first($existing);
-            if (is_string($first) && $first !== '') {
-                return $first;
-            }
-        }
-
-        $filename = sprintf('%s_create_ip_ranges_table.php', date('Y_m_d_His'));
-
-        return $this->app->databasePath('migrations/'.$filename);
     }
 
     private function resolveModelPath(): string

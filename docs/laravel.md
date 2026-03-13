@@ -47,7 +47,7 @@ If you disable package auto-discovery, register `IPTools\IPToolsServiceProvider`
 ## Publishable Assets
 
 - `iptools-config` -> `config/iptools.php`
-- `iptools-migrations` -> migration stub for `ip_ranges`
+- `iptools-migrations` -> package migration files
 - `iptools-model` -> `app/Models/IpRange.php`
 
 Commands:

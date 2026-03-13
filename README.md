@@ -4,7 +4,7 @@ PHP Library for manipulating network addresses (IPv4 and IPv6).
 
 This repository is a fork of [S1lentium/IPTools](https://github.com/S1lentium/IPTools).
 
-[![Build Status](https://app.travis-ci.com/h3mantD/IPTools.svg?branch=master)](https://app.travis-ci.com/github/h3mantD/IPTools)
+[![CI](https://github.com/h3mantD/IPTools/actions/workflows/ci.yml/badge.svg)](https://github.com/h3mantD/IPTools/actions/workflows/ci.yml)
 [![Code Climate](https://codeclimate.com/github/h3mantd/IPTools/badges/gpa.svg)](https://codeclimate.com/github/h3mantd/IPTools)
 
 [![PHP 8.2](https://img.shields.io/badge/PHP-8.2-8892BF.svg)](http://php.net)
