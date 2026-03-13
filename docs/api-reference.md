@@ -2,11 +2,13 @@
 
 Back to index: [Documentation Index](README.md)
 
-This file summarizes the public API surface for the main package classes.
+This document is a quick lookup for the public API surface of IPTools classes.
+
+Use this reference when you already know the feature area and need signatures quickly. If you need conceptual guidance, start with the guide pages in `docs/README.md`.
 
 ## IPTools\IP
 
-Creation/parsing:
+Creation and parsing:
 
 - `__construct(string $ip)`
 - `static parse(int|string $ip): IP`
@@ -76,7 +78,7 @@ Core:
 - `static netmask2prefix(IP $ip): int`
 - `static summarize(array $networks): Network[]`
 
-Getters/setters:
+Getters and setters:
 
 - `setIP(IP $ip): void`
 - `setNetmask(IP $ip): void`
@@ -113,7 +115,7 @@ Operations:
 - `getCountPrecise(): numeric-string`
 - `count(): int`
 
-Iteration (`Iterator`):
+Iterator methods:
 
 - `current(): IP`
 - `key(): int`
@@ -129,7 +131,7 @@ Core:
 - `static parse(string $data): Range`
 - `contains(IP|Network|Range $find): bool`
 
-Getters/setters:
+Getters and setters:
 
 - `setFirstIP(IP $ip): void`
 - `setLastIP(IP $ip): void`
@@ -145,14 +147,14 @@ Network decomposition:
 - `getNthNetwork(int $index): ?Network`
 - `getSpanNetwork(): Network`
 
-Indexing/counting:
+Indexing and counting:
 
 - `addressAt(int|string $offset): ?IP`
 - `addressAtOrFail(int|string $offset): IP`
 - `getCountPrecise(): numeric-string`
 - `count(): int`
 
-Iteration (`Iterator`):
+Iterator methods:
 
 - `current(): IP`
 - `key(): int`
