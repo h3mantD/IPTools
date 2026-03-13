@@ -24,7 +24,7 @@ trait PropertyTrait
             }
         }
 
-        trigger_error('Undefined property');
+        trigger_error(sprintf('Undefined property: %s::$%s', static::class, $name));
 
         return null;
     }
@@ -33,7 +33,7 @@ trait PropertyTrait
     {
         $method = 'set'.ucfirst($name);
         if (! method_exists($this, $method)) {
-            trigger_error('Undefined property');
+            trigger_error(sprintf('Undefined property: %s::$%s', static::class, $name));
 
             return;
         }

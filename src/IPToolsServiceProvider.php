@@ -9,6 +9,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\ServiceProvider;
+use IPTools\Console\InstallCommand;
 use IPTools\Storage\LaravelRangeStorage;
 use IPTools\Storage\RangeStorageInterface;
 
@@ -47,32 +48,30 @@ final class IPToolsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $configPath = $this->resolveConfigPath();
-        $migrationPath = $this->resolveMigrationPath();
         $modelPath = $this->resolveModelPath();
 
         $this->publishes([
             __DIR__.'/../config/iptools.php' => $configPath,
         ], 'iptools-config');
 
-        $this->publishes([
-            __DIR__.'/../database/migrations/create_ip_ranges_table.php.stub' => $migrationPath,
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => $this->app->databasePath('migrations'),
         ], 'iptools-migrations');
 
         $this->publishes([
             __DIR__.'/../stubs/IpRange.php.stub' => $modelPath,
         ], 'iptools-model');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                InstallCommand::class,
+            ]);
+        }
     }
 
     private function resolveConfigPath(): string
     {
         return $this->app->configPath('iptools.php');
-    }
-
-    private function resolveMigrationPath(): string
-    {
-        $filename = sprintf('%s_create_ip_ranges_table.php', date('Y_m_d_His'));
-
-        return $this->app->databasePath('migrations/'.$filename);
     }
 
     private function resolveModelPath(): string

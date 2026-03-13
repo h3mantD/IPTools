@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class IpRange extends Model
 {
-    protected $table = 'ip_ranges';
-
     public $timestamps = false;
 
     protected $guarded = [];
@@ -18,4 +16,14 @@ class IpRange extends Model
         'version' => 'integer',
         'metadata' => 'array',
     ];
+
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $configuredTable = function_exists('config') ? config('iptools.storage.table') : null;
+        $this->table = is_string($configuredTable) && $configuredTable !== ''
+            ? $configuredTable
+            : 'ip_ranges';
+    }
 }

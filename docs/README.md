@@ -33,10 +33,12 @@ If you prefer to jump straight to method signatures, start with [API Reference](
   - SQL schema and query usage
 - [Laravel Integration Guide](laravel.md)
   - Service provider wiring
-  - Publishable config/migration/model stubs
+  - Publishable config/migration/model assets
   - Container and adapter usage
 - [API Reference](api-reference.md)
   - Public classes and methods in one place
+- [Package Tracker](package-tracker.md)
+  - Validated bug/DX follow-up list
 
 ## Suggested Learning Path
 

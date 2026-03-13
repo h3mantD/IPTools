@@ -8,12 +8,17 @@ use Illuminate\Database\Connection;
 use IPTools\IP;
 use IPTools\Network;
 use IPTools\Range;
+use PDO;
 
-final readonly class LaravelRangeStorage implements RangeStorageInterface
+final class LaravelRangeStorage implements RangeStorageInterface
 {
+    private ?PDO $pdo = null;
+
+    private ?SqlRangeStorage $storage = null;
+
     public function __construct(
-        private Connection $connection,
-        private string $table = 'ip_ranges',
+        private readonly Connection $connection,
+        private readonly string $table = 'ip_ranges',
     ) {}
 
     /**
@@ -35,7 +40,7 @@ final readonly class LaravelRangeStorage implements RangeStorageInterface
     }
 
     /**
-     * @return iterable<array{range: Network|Range, metadata: array<string, mixed>}>
+     * @return iterable<array{range: Range, metadata: array<string, mixed>}>
      */
     public function findContaining(IP $ip): iterable
     {
@@ -49,6 +54,13 @@ final readonly class LaravelRangeStorage implements RangeStorageInterface
 
     private function storage(): SqlRangeStorage
     {
-        return new SqlRangeStorage($this->connection->getPdo(), $this->table);
+        $pdo = $this->connection->getPdo();
+
+        if (! $this->storage instanceof SqlRangeStorage || $this->pdo !== $pdo) {
+            $this->pdo = $pdo;
+            $this->storage = new SqlRangeStorage($pdo, $this->table);
+        }
+
+        return $this->storage;
     }
 }

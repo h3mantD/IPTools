@@ -88,7 +88,7 @@ final class SqlRangeStorage implements RangeStorageInterface
     }
 
     /**
-     * @return iterable<array{range: Network|Range, metadata: array<string, mixed>}>
+     * @return iterable<array{range: Range, metadata: array<string, mixed>}>
      */
     public function findContaining(IP $ip): iterable
     {
@@ -178,7 +178,7 @@ final class SqlRangeStorage implements RangeStorageInterface
         } catch (Throwable $throwable) {
             throw new RuntimeException(
                 sprintf(
-                    'Table "%s" is not available. Create it before using DB-backed range storage.',
+                    'Table "%s" is not available. Create it before using DB-backed range storage. If you use Laravel, run "php artisan vendor:publish --tag=iptools-migrations" then "php artisan migrate".',
                     $this->table
                 ),
                 0,

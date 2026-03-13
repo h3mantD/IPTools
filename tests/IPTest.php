@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPTools\IP;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class IPTest extends TestCase
@@ -112,9 +113,7 @@ final class IPTest extends TestCase
         $this->assertEquals(IP::IP_V6_OCTETS, $ipv6->getOctetsCount());
     }
 
-    /**
-     * @dataProvider getTestConstructorExceptionData
-     */
+    #[DataProvider('getTestConstructorExceptionData')]
     public function test_constructor_exception(string $string): void
     {
         $this->expectException(Exception::class);
@@ -145,27 +144,21 @@ final class IPTest extends TestCase
         $this->assertNotEmpty($ip->hex);
     }
 
-    /**
-     * @dataProvider getToStringData
-     */
+    #[DataProvider('getToStringData')]
     public function test_to_string(string $actual, string $expected): void
     {
         $ip = new IP($actual);
         $this->assertEquals($expected, (string) $ip);
     }
 
-    /**
-     * @dataProvider getTestParseData
-     */
+    #[DataProvider('getTestParseData')]
     public function test_parse(int|string $ipString, string $expected): void
     {
         $ip = IP::parse($ipString);
         $this->assertEquals($expected, (string) $ip);
     }
 
-    /**
-     * @dataProvider getParseBinData
-     */
+    #[DataProvider('getParseBinData')]
     public function test_parse_bin(string $bin, string $expectedString): void
     {
         $ip = IP::parseBin($bin);
@@ -252,9 +245,7 @@ final class IPTest extends TestCase
         $this->assertEquals($inAddr, $ip->inAddr());
     }
 
-    /**
-     * @dataProvider getTestNextData
-     */
+    #[DataProvider('getTestNextData')]
     public function test_next(string $ip, int $step, string $expected): void
     {
         $object = new IP($ip);
@@ -263,9 +254,7 @@ final class IPTest extends TestCase
         $this->assertEquals($expected, (string) $next);
     }
 
-    /**
-     * @dataProvider getTestPrevData
-     */
+    #[DataProvider('getTestPrevData')]
     public function test_previous(string $ip, int $step, string $expected): void
     {
         $object = new IP($ip);
@@ -284,9 +273,7 @@ final class IPTest extends TestCase
         $object->previous(-1);
     }
 
-    /**
-     * @dataProvider getReversePointerData
-     */
+    #[DataProvider('getReversePointerData')]
     public function test_reverse_pointer(string $ip, string $expected): void
     {
         $object = new IP($ip);
@@ -294,9 +281,7 @@ final class IPTest extends TestCase
         $this->assertEquals($expected, $reversePointer);
     }
 
-    /**
-     * @dataProvider getExpandedData
-     */
+    #[DataProvider('getExpandedData')]
     public function test_expanded(string $ip, string $expected): void
     {
         $object = new IP($ip);
