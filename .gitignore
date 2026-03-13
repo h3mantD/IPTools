@@ -30,6 +30,8 @@ phpunit.xml.dist
 
 # coverage report
 /coverage
+/build/
+/tests/var/
 
 composer.phar
 composer.lock
