@@ -171,7 +171,7 @@ final class Parser
             }
 
             $value = (int) $part;
-            if ($value < 0 || $value > 255) {
+            if ($value > 255) {
                 return null;
             }
 
@@ -227,16 +227,12 @@ final class Parser
      */
     private static function parsePort(string $port): int
     {
-        if (! ctype_digit($port)) {
-            throw new IpException('Invalid port format');
-        }
-
         if (strlen($port) > 5) {
             throw new IpException('Port must be in the range 0-65535');
         }
 
         $parsedPort = (int) $port;
-        if ($parsedPort < 0 || $parsedPort > 65535) {
+        if ($parsedPort > 65535) {
             throw new IpException('Port must be in the range 0-65535');
         }
 

@@ -42,9 +42,6 @@ class IP implements Stringable
      */
     public function __construct(string $ip)
     {
-        if (! filter_var($ip, FILTER_VALIDATE_IP)) {
-            throw new IpException('Invalid IP address format');
-        }
         $inAddr = inet_pton($ip);
         if ($inAddr === false) {
             throw new IpException('Invalid IP address format');
@@ -247,20 +244,11 @@ class IP implements Stringable
 
     public function getVersion(): string
     {
-        $ip = inet_ntop($this->in_addr);
-        if ($ip === false) {
-            throw new IpException('Unable to unpack IP address');
-        }
-
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            return self::IP_V4;
-        }
-
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            return self::IP_V6;
-        }
-
-        throw new IpException('Unable to determine IP version');
+        return match (strlen($this->in_addr)) {
+            self::IP_V4_OCTETS => self::IP_V4,
+            self::IP_V6_OCTETS => self::IP_V6,
+            default => throw new IpException('Unable to determine IP version'),
+        };
     }
 
     public function getMaxPrefixLength(): int

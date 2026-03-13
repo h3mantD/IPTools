@@ -266,12 +266,7 @@ class Network implements Countable, Iterator, Stringable
             return $network;
         }
 
-        $host = $network->next();
-        if (! $host instanceof IP) {
-            throw new NetworkException('Unable to calculate first host address');
-        }
-
-        return $host;
+        return $network->next() ?? throw new NetworkException('Unable to calculate first host address');
     }
 
     public function lastHost(): IP
@@ -286,12 +281,7 @@ class Network implements Countable, Iterator, Stringable
             return $broadcast;
         }
 
-        $host = $broadcast->previous();
-        if (! $host instanceof IP) {
-            throw new NetworkException('Unable to calculate last host address');
-        }
-
-        return $host;
+        return $broadcast->previous() ?? throw new NetworkException('Unable to calculate last host address');
     }
 
     /**
