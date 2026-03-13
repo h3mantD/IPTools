@@ -203,7 +203,7 @@ Related:
 - `store(Network|Range $range, array $metadata = []): void`
 - `delete(Network|Range $range): void`
 - `contains(IP $ip): bool`
-- `findContaining(IP $ip): iterable<array{range: Network|Range, metadata: array}>`
+- `findContaining(IP $ip): iterable<array{range: Range, metadata: array}>`
 - `count(): int`
 
 ### IPTools\Storage\SqlRangeStorage
@@ -225,6 +225,7 @@ Related:
 
 - `IPTools\IPToolsServiceProvider`
 - `IPTools\Models\IpRange`
+- `IPTools\Console\InstallCommand` (`iptools:install`)
 
 ## Enums
 

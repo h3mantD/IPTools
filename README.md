@@ -191,6 +191,7 @@ var_dump($storage->contains(new IP('192.0.2.10'))); // true
 
 foreach ($storage->findContaining(new IP('192.0.2.10')) as $match) {
     echo $match['range']->getFirstIP() . '-' . $match['range']->getLastIP() . PHP_EOL;
+    var_dump($match['metadata']);
 }
 ```
 
@@ -232,19 +233,23 @@ Dependency behavior:
 - If your project is not a Laravel app but you still want Laravel integration helpers, install them explicitly:
 
 ```bash
-composer require illuminate/support illuminate/database
+composer require illuminate/support illuminate/database illuminate/console
 ```
 
 Laravel classes are provided under normal package namespaces (not under a dedicated `Laravel/` directory):
 - `IPTools\IPToolsServiceProvider`
 - `IPTools\Storage\LaravelRangeStorage`
 - `IPTools\Models\IpRange`
+- `IPTools\Console\InstallCommand` (`iptools:install`)
 
 If your app uses package auto-discovery, the service provider is registered automatically.
 
 1) Publish config (optional but recommended):
 
 ```bash
+php artisan iptools:install
+
+# Manual alternative
 php artisan vendor:publish --tag=iptools-config
 ```
 

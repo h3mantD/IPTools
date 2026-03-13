@@ -5,6 +5,7 @@ declare(strict_types=1);
 use IPTools\IP;
 use IPTools\Network;
 use IPTools\Range;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class RangeTest extends TestCase
@@ -118,9 +119,7 @@ final class RangeTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider getTestParseData
-     */
+    #[DataProvider('getTestParseData')]
     public function test_parse(string $data, array $expected): void
     {
         $range = Range::parse($data);
@@ -129,9 +128,7 @@ final class RangeTest extends TestCase
         $this->assertEquals($expected[1], $range->lastIP);
     }
 
-    /**
-     * @dataProvider getTestNetworksData
-     */
+    #[DataProvider('getTestNetworksData')]
     public function test_get_networks(string $data, array $expected): void
     {
         $result = [];
@@ -183,17 +180,13 @@ final class RangeTest extends TestCase
         $this->assertSame('2001:db8::/64', (string) $nthNetwork);
     }
 
-    /**
-     * @dataProvider getTestContainsData
-     */
+    #[DataProvider('getTestContainsData')]
     public function test_contains(string $data, string $find, bool $expected): void
     {
         $this->assertEquals($expected, Range::parse($data)->contains(new IP($find)));
     }
 
-    /**
-     * @dataProvider getTestIterationData
-     */
+    #[DataProvider('getTestIterationData')]
     public function test_range_iteration(string $data, array $expected): void
     {
         $result = [];
@@ -204,17 +197,13 @@ final class RangeTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
-    /**
-     * @dataProvider getTestCountData
-     */
+    #[DataProvider('getTestCountData')]
     public function test_count(string $data, int $expected): void
     {
         $this->assertEquals($expected, count(Range::parse($data)));
     }
 
-    /**
-     * @dataProvider getPreciseCountData
-     */
+    #[DataProvider('getPreciseCountData')]
     public function test_count_precise(string $data, string $expectedPrecise, int $expectedCount): void
     {
         $range = Range::parse($data);

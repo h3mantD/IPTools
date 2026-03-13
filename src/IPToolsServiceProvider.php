@@ -8,7 +8,9 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
+use IPTools\Console\InstallCommand;
 use IPTools\Storage\LaravelRangeStorage;
 use IPTools\Storage\RangeStorageInterface;
 
@@ -61,6 +63,12 @@ final class IPToolsServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../stubs/IpRange.php.stub' => $modelPath,
         ], 'iptools-model');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                InstallCommand::class,
+            ]);
+        }
     }
 
     private function resolveConfigPath(): string
@@ -70,6 +78,14 @@ final class IPToolsServiceProvider extends ServiceProvider
 
     private function resolveMigrationPath(): string
     {
+        $existing = glob((string) $this->app->databasePath('migrations/*_create_ip_ranges_table.php'));
+        if (is_array($existing) && $existing !== []) {
+            $first = Arr::first($existing);
+            if (is_string($first) && $first !== '') {
+                return $first;
+            }
+        }
+
         $filename = sprintf('%s_create_ip_ranges_table.php', date('Y_m_d_His'));
 
         return $this->app->databasePath('migrations/'.$filename);

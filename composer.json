@@ -28,15 +28,17 @@
         "ext-bcmath": "*"
     },
     "suggest": {
+        "illuminate/console": "Required to use the iptools:install Artisan command",
         "illuminate/database": "Required to use the LaravelRangeStorage adapter and Eloquent model",
         "illuminate/support": "Required for Laravel service provider integration and publishing assets"
     },
     "require-dev": {
         "php-coveralls/php-coveralls": "^2.5",
-        "phpunit/phpunit": "^10.5",
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0",
         "laravel/pint": "^1.27",
         "rector/rector": "^2.3",
         "phpstan/phpstan": "^2.1",
+        "illuminate/console": "^11.0 || ^12.0",
         "illuminate/support": "^11.0 || ^12.0",
         "illuminate/database": "^11.0 || ^12.0"
     },

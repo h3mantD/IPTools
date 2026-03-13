@@ -9,14 +9,16 @@ Primary classes:
 - `IPTools\IPToolsServiceProvider`
 - `IPTools\Storage\LaravelRangeStorage`
 - `IPTools\Models\IpRange`
+- `IPTools\Console\InstallCommand` (`iptools:install`)
 
 ## Quick Start
 
 1. Install the package.
-2. Publish config and migration.
-3. Run migrations.
-4. Resolve `RangeStorageInterface` from the container.
-5. Start storing and querying ranges.
+2. Run `php artisan iptools:install`.
+3. Resolve `RangeStorageInterface` from the container.
+4. Start storing and querying ranges.
+
+Or run commands manually if you want granular control.
 
 ## Dependency Model
 
@@ -25,7 +27,7 @@ Primary classes:
 - If needed outside full Laravel, install:
 
 ```bash
-composer require illuminate/support illuminate/database
+composer require illuminate/support illuminate/database illuminate/console
 ```
 
 In a standard Laravel app, you usually do not need to install these manually.
@@ -51,6 +53,9 @@ If you disable package auto-discovery, register `IPTools\IPToolsServiceProvider`
 Commands:
 
 ```bash
+php artisan iptools:install
+
+# Manual alternative
 php artisan vendor:publish --tag=iptools-config
 php artisan vendor:publish --tag=iptools-migrations
 php artisan vendor:publish --tag=iptools-model
@@ -90,6 +95,36 @@ var_dump($storage->contains(new IP('10.0.0.42')));
 
 This is the recommended approach for app-level code because it respects package config and container wiring.
 
+## End-to-End Example
+
+```php
+use IPTools\IP;
+use IPTools\Network;
+use IPTools\Storage\RangeStorageInterface;
+
+$storage = app(RangeStorageInterface::class);
+
+$network = Network::parse('10.24.0.0/16');
+
+$storage->store($network, [
+    'policy' => 'allow',
+    'source' => 'admin-ui',
+    'priority' => 100,
+]);
+
+$contains = $storage->contains(new IP('10.24.5.10')); // true
+
+$matches = iterator_to_array($storage->findContaining(new IP('10.24.5.10')), false);
+foreach ($matches as $row) {
+    $range = $row['range'];      // IPTools\Range
+    $metadata = $row['metadata']; // array<string, mixed>
+}
+
+$storage->delete($network);
+```
+
+`findContaining()` always returns `Range` rows with metadata payloads.
+
 ## Direct Adapter Usage
 
 ```php
@@ -113,6 +148,25 @@ $rows = IpRange::query()->where('version', 4)->limit(20)->get();
 
 The model is optional and mainly useful for admin/reporting tools.
 
+## Custom Connection and Table
+
+Set config values:
+
+```php
+return [
+    'storage' => [
+        'connection' => env('IPTOOLS_DB_CONNECTION', 'mysql'),
+        'table' => env('IPTOOLS_RANGES_TABLE', 'tenant_ip_ranges'),
+    ],
+];
+```
+
+Then clear cached config:
+
+```bash
+php artisan config:clear
+```
+
 ## Troubleshooting
 
 ### "Table is not available" runtime error
@@ -124,6 +178,12 @@ Fix:
 ```bash
 php artisan vendor:publish --tag=iptools-migrations
 php artisan migrate
+```
+
+Or run the one-step installer:
+
+```bash
+php artisan iptools:install
 ```
 
 ### Nothing resolves for `RangeStorageInterface`

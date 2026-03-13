@@ -105,6 +105,15 @@ Method semantics:
 - `findContaining(IP $ip)` yields all matching ranges + metadata
 - `count()` returns row count in the backing table
 
+`findContaining()` payload shape:
+
+```php
+[
+    'range' => IPTools\Range,
+    'metadata' => array<string, mixed>,
+]
+```
+
 ## Error Behavior
 
 - Constructor validates table name format.

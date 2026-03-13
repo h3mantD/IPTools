@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use IPTools\IP;
 use IPTools\Network;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class NetworkTest extends TestCase
@@ -238,9 +239,7 @@ final class NetworkTest extends TestCase
         $this->assertEquals('192.0.0.255', (string) $network->lastIP);
     }
 
-    /**
-     * @dataProvider getTestParseData
-     */
+    #[DataProvider('getTestParseData')]
     public function test_parse(string $data, string $expected): void
     {
         $this->assertEquals($expected, (string) Network::parse($data));
@@ -254,9 +253,7 @@ final class NetworkTest extends TestCase
         Network::parse('10.0.0.0/24 abc');
     }
 
-    /**
-     * @dataProvider getPrefixData
-     */
+    #[DataProvider('getPrefixData')]
     public function test_prefix2_mask(string $prefix, string $version, IP $mask): void
     {
         $this->assertEquals($mask, Network::prefix2netmask($prefix, $version));
@@ -270,9 +267,7 @@ final class NetworkTest extends TestCase
         Network::prefix2netmask('128', 'ip_version');
     }
 
-    /**
-     * @dataProvider getInvalidPrefixData
-     */
+    #[DataProvider('getInvalidPrefixData')]
     public function test_prefix2_mask_invalid_prefix(string $prefix, string $version): void
     {
         $this->expectException(Exception::class);
@@ -281,9 +276,7 @@ final class NetworkTest extends TestCase
         Network::prefix2netmask($prefix, $version);
     }
 
-    /**
-     * @dataProvider getHostsData
-     */
+    #[DataProvider('getHostsData')]
     public function test_hosts(string $data, array $expected): void
     {
         $result = [];
@@ -295,9 +288,7 @@ final class NetworkTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
-    /**
-     * @dataProvider getExcludeData
-     */
+    #[DataProvider('getExcludeData')]
     public function test_exclude(string $data, string $exclude, array $expected): void
     {
         $result = [];
@@ -309,9 +300,7 @@ final class NetworkTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
-    /**
-     * @dataProvider getExcludeExceptionData
-     */
+    #[DataProvider('getExcludeExceptionData')]
     public function test_exclude_exception(string $data, string $exclude): void
     {
         $this->expectException(Exception::class);
@@ -320,9 +309,7 @@ final class NetworkTest extends TestCase
         Network::parse($data)->exclude($exclude);
     }
 
-    /**
-     * @dataProvider getMoveToData
-     */
+    #[DataProvider('getMoveToData')]
     public function test_move_to(string $network, string $prefixLength, array $expected): void
     {
         $result = [];
@@ -334,9 +321,7 @@ final class NetworkTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
-    /**
-     * @dataProvider getMoveToExceptionData
-     */
+    #[DataProvider('getMoveToExceptionData')]
     public function test_move_to_exception(string $network, string $prefixLength): void
     {
         $this->expectException(Exception::class);
@@ -345,9 +330,7 @@ final class NetworkTest extends TestCase
         Network::parse($network)->moveTo($prefixLength);
     }
 
-    /**
-     * @dataProvider getTestIterationData
-     */
+    #[DataProvider('getTestIterationData')]
     public function test_network_iteration(string $data, array $expected): void
     {
         $result = [];
@@ -359,17 +342,13 @@ final class NetworkTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
-    /**
-     * @dataProvider getTestCountData
-     */
+    #[DataProvider('getTestCountData')]
     public function test_count(string $data, int $expected): void
     {
         $this->assertCount($expected, Network::parse($data));
     }
 
-    /**
-     * @dataProvider getPreciseCountData
-     */
+    #[DataProvider('getPreciseCountData')]
     public function test_count_precise(string $data, string $expectedPrecise, int $expectedCount): void
     {
         $network = Network::parse($data);
@@ -378,9 +357,7 @@ final class NetworkTest extends TestCase
         $this->assertSame($expectedCount, count($network));
     }
 
-    /**
-     * @dataProvider getSummarizeData
-     */
+    #[DataProvider('getSummarizeData')]
     public function test_summarize(array $data, array $expected): void
     {
         $result = [];

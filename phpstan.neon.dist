@@ -2,6 +2,12 @@ parameters:
     paths:
         - src
 
+    stubFiles:
+        - phpstan-stubs/IlluminateConsoleCommand.php
+
+    scanFiles:
+        - phpstan-stubs/IlluminateConsoleCommand.php
+
     excludePaths:
         - vendor/
 

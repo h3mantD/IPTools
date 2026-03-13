@@ -20,7 +20,7 @@ interface RangeStorageInterface
     public function contains(IP $ip): bool;
 
     /**
-     * @return iterable<array{range: Network|Range, metadata: array<string, mixed>}>
+     * @return iterable<array{range: Range, metadata: array<string, mixed>}>
      */
     public function findContaining(IP $ip): iterable;
 
