@@ -42,7 +42,9 @@ final class InstallCommandTest extends TestCase
         $command = new InstallCommand;
         $this->wireCommandForHandleExecution($command, ['--force' => true, '--no-migrate' => true]);
 
-        $command->handle();
+        $exitCode = $command->handle();
+
+        $this->assertSame(Command::SUCCESS, $exitCode);
 
         $this->assertSame([
             ['vendor:publish', ['tag' => 'iptools-config', 'force' => true]],
