@@ -36,3 +36,8 @@ phpunit.xml.dist
 composer.phar
 composer.lock
 plan.md
+
+.remember
+
+# Example apps (local testing only)
+/examples/
