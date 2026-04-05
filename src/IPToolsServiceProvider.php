@@ -13,6 +13,10 @@ use IPTools\Console\InstallCommand;
 use IPTools\Storage\LaravelRangeStorage;
 use IPTools\Storage\RangeStorageInterface;
 
+/**
+ * Registers IPTools services in the Laravel container and publishes
+ * config, migrations, and model stub for artisan setup.
+ */
 final class IPToolsServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -23,6 +27,7 @@ final class IPToolsServiceProvider extends ServiceProvider
             /** @var ConfigRepository $config */
             $config = $app->make('config');
 
+            // Resolve connection name: null falls through to Laravel's default connection
             $connectionValue = $config->get('iptools.storage.connection');
             $connectionName = is_string($connectionValue) && $connectionValue !== ''
                 ? $connectionValue
@@ -42,6 +47,7 @@ final class IPToolsServiceProvider extends ServiceProvider
             return new LaravelRangeStorage($connection, $table);
         });
 
+        // Allow type-hinting the interface to resolve the Laravel adapter
         $this->app->alias(LaravelRangeStorage::class, RangeStorageInterface::class);
     }
 

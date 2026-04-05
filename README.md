@@ -128,7 +128,7 @@ echo $distance; // 9
 ```
 
 ```php
-use IPTools\OverflowMode;
+use IPTools\Enums\OverflowMode;
 
 $max = new IP('255.255.255.255');
 

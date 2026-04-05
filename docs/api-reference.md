@@ -231,7 +231,7 @@ Related:
 
 ## Enums
 
-### IPTools\IPType
+### IPTools\Enums\IPType
 
 - `UNSPECIFIED`
 - `LOOPBACK`
@@ -246,7 +246,7 @@ Related:
 - `RESERVED`
 - `GLOBAL`
 
-### IPTools\OverflowMode
+### IPTools\Enums\OverflowMode
 
 - `THROW`
 - `NULL`

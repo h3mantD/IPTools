@@ -11,6 +11,16 @@ use PDO;
 use RuntimeException;
 use Throwable;
 
+/**
+ * PDO-based range storage (MySQL, PostgreSQL, SQLite).
+ *
+ * Stores ranges as 16-byte binary (via AddressCodec) with a version column
+ * for efficient indexed lookups. Containment queries use simple binary
+ * comparisons: `start_bin <= addr AND end_bin >= addr`.
+ *
+ * Table existence is lazily verified on first use and cached for the
+ * lifetime of the instance.
+ */
 final class SqlRangeStorage implements RangeStorageInterface
 {
     private readonly string $table;
@@ -19,6 +29,7 @@ final class SqlRangeStorage implements RangeStorageInterface
 
     public function __construct(private readonly PDO $pdo, string $table = 'ip_ranges')
     {
+        // Whitelist: identifier-safe characters only (alphanumeric + underscore, starts with letter or underscore)
         if (preg_match('/^[A-Za-z_]\w*$/', $table) !== 1) {
             throw new RuntimeException('Invalid table name');
         }
@@ -160,9 +171,14 @@ final class SqlRangeStorage implements RangeStorageInterface
 
     private function versionToInt(IP $ip): int
     {
-        return $ip->getVersion() === IP::IP_V4 ? 4 : 6;
+        return $ip->getVersion()->toInt();
     }
 
+    /**
+     * Lazy table existence check — runs a trivial SELECT on first use,
+     * then caches the result. Provides a clear error message directing
+     * users to run migrations if the table is missing.
+     */
     private function ensureTableExists(): void
     {
         if ($this->tableVerified) {
@@ -187,6 +203,10 @@ final class SqlRangeStorage implements RangeStorageInterface
         }
     }
 
+    /**
+     * Read a BLOB column that PDO may return as a stream resource (PostgreSQL)
+     * or as a raw string (MySQL, SQLite).
+     */
     private function readBinaryColumn(mixed $value): string
     {
         if (is_resource($value)) {

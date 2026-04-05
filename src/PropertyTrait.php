@@ -5,6 +5,15 @@ declare(strict_types=1);
 namespace IPTools;
 
 /**
+ * Enables property-style access to getter/setter methods.
+ *
+ * Resolution order for `$obj->foo`:
+ *   1. `$obj->foo()` — direct method name match
+ *   2. `$obj->getFoo()` — standard getter prefix
+ *   3. `$obj->toFoo()` — conversion prefix (e.g., `$ip->hex` calls `toHex()`)
+ *
+ * For writes, `$obj->foo = $value` calls `$obj->setFoo($value)`.
+ *
  * @author Safarov Alisher <alisher.safarov@outlook.com>
  *
  * @link https://github.com/S1lentium/IPTools
@@ -17,6 +26,7 @@ trait PropertyTrait
             return $this->$name();
         }
 
+        // Try 'get' first (getVersion), then 'to' (toHex, toBin, toLong)
         foreach (['get', 'to'] as $prefix) {
             $method = $prefix.ucfirst($name);
             if (method_exists($this, $method)) {

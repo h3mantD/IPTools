@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace IPTools;
 
+use IPTools\Enums\IPType;
+use IPTools\Enums\IPVersion;
+
 /**
  * IANA-backed IP type classification registry.
  *
@@ -36,6 +39,9 @@ final class TypeRegistry
         IPType::RESERVED,
         IPType::GLOBAL,
     ];
+
+    // Static cache: IANA ranges are immutable, so we build the lookup table once
+    // per process and reuse it across all classify() calls.
 
     /** @var array<int, array{type: IPType, network: Network}>|null */
     private static ?array $ipv4Ranges = null;
@@ -140,11 +146,11 @@ final class TypeRegistry
      */
     public static function classify(IP $ip): array
     {
-        $ranges = $ip->getVersion() === IP::IP_V4 ? self::ipv4() : self::ipv6();
+        $ranges = $ip->getVersion() === IPVersion::IPv4 ? self::ipv4() : self::ipv6();
         $matched = [];
 
         foreach ($ranges as ['type' => $type, 'network' => $network]) {
-            if (self::ipInNetwork($ip, $network)) {
+            if ($network->containsIP($ip)) {
                 $matched[$type->name] = $type;
             }
         }
@@ -158,12 +164,6 @@ final class TypeRegistry
             self::PRECEDENCE,
             static fn (IPType $t): bool => isset($matched[$t->name]),
         ));
-    }
-
-    private static function ipInNetwork(IP $ip, Network $network): bool
-    {
-        return strcmp($ip->inAddr(), $network->getFirstIP()->inAddr()) >= 0
-            && strcmp($ip->inAddr(), $network->getLastIP()->inAddr()) <= 0;
     }
 
     /**

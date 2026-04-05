@@ -6,6 +6,10 @@ namespace IPTools;
 
 use InvalidArgumentException;
 
+/**
+ * Result of Parser::ip() — holds the parsed IP along with optional
+ * port (from `1.2.3.4:80` or `[::1]:443`) and zone ID (from `fe80::1%eth0`).
+ */
 final readonly class ParsedAddress
 {
     public function __construct(

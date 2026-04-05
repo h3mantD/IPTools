@@ -55,7 +55,7 @@ echo $ip->toLong();        // numeric-string
 Classification helpers let you build routing, filtering, and safety logic.
 
 ```php
-use IPTools\IPType;
+use IPTools\Enums\IPType;
 
 $ip = new IP('127.0.0.1');
 
@@ -109,7 +109,7 @@ NAT64 notes:
 Use arithmetic APIs for offset-based traversal, indexing, and distance calculations.
 
 ```php
-use IPTools\OverflowMode;
+use IPTools\Enums\OverflowMode;
 
 $ip = new IP('192.168.0.1');
 

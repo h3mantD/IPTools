@@ -10,6 +10,13 @@ use IPTools\Network;
 use IPTools\Range;
 use PDO;
 
+/**
+ * Laravel adapter that bridges Illuminate\Database\Connection to SqlRangeStorage.
+ *
+ * Delegates all operations to an underlying SqlRangeStorage instance, lazily
+ * created from the Connection's PDO handle. The PDO instance is tracked so
+ * the storage is rebuilt if Laravel reconnects (new PDO object identity).
+ */
 final class LaravelRangeStorage implements RangeStorageInterface
 {
     private ?PDO $pdo = null;
@@ -52,6 +59,13 @@ final class LaravelRangeStorage implements RangeStorageInterface
         return $this->storage()->count();
     }
 
+    /**
+     * Lazily create (or refresh) the underlying SqlRangeStorage.
+     *
+     * Compares PDO object identity to detect reconnects — if Laravel's
+     * Connection has been reconnected, $connection->getPdo() returns a
+     * new instance, and we must rebuild SqlRangeStorage to use it.
+     */
     private function storage(): SqlRangeStorage
     {
         $pdo = $this->connection->getPdo();

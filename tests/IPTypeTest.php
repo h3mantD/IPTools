@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use IPTools\Enums\IPType;
 use IPTools\IP;
-use IPTools\IPType;
 use IPTools\TypeRegistry;
 use PHPUnit\Framework\TestCase;
 

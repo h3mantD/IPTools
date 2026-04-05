@@ -5,11 +5,27 @@ declare(strict_types=1);
 namespace IPTools;
 
 use InvalidArgumentException;
+use IPTools\Enums\IPVersion;
 use IPTools\Exception\IpException;
 
+/**
+ * Flexible input parser for IP addresses, ranges, and networks.
+ *
+ * Supports standard notation plus optional extras controlled by ParseFlags:
+ *   - Ports:           `192.168.1.1:80`, `[::1]:443`
+ *   - Zone IDs:        `fe80::1%eth0`
+ *   - Wildcards:       `192.168.*.*` → Network
+ *   - Non-decimal IPv4: `0x0a000001`, `0b...`, `0o...`
+ *   - Non-quad IPv4:   `10.1` → `10.0.0.1`
+ *   - Ranges:          `10.0.0.1-10.0.0.100`
+ *   - CIDR:            `10.0.0.0/24`
+ *   - Dotted netmask:  `10.0.0.0 255.255.255.0`
+ */
 final class Parser
 {
     /**
+     * Parse a single IP address with optional port and zone ID.
+     *
      * @throws IpException
      */
     public static function ip(string $input, int $flags = ParseFlags::DEFAULT): ParsedAddress
@@ -22,6 +38,7 @@ final class Parser
         $port = null;
         $addressPart = $input;
 
+        // Extract port: [IPv6]:port (RFC 3986 bracket notation) or IPv4:port
         if (self::hasFlag($flags, ParseFlags::ALLOW_PORT)) {
             if (preg_match('/^\[(.+)]:(\d+)$/', $input, $matches) === 1) {
                 $addressPart = $matches[1];
@@ -32,6 +49,7 @@ final class Parser
             }
         }
 
+        // Extract zone ID (interface scope for IPv6 link-local, e.g. fe80::1%eth0)
         $zoneId = null;
         if (str_contains($addressPart, '%')) {
             if (! self::hasFlag($flags, ParseFlags::ALLOW_ZONE_ID)) {
@@ -46,7 +64,7 @@ final class Parser
 
         $ip = self::parseAddress($addressPart, $flags);
 
-        if ($zoneId !== null && $ip->getVersion() !== IP::IP_V6) {
+        if ($zoneId !== null && $ip->getVersion() !== IPVersion::IPv6) {
             throw new IpException('Zone identifiers are only valid for IPv6 addresses');
         }
 
@@ -54,6 +72,10 @@ final class Parser
     }
 
     /**
+     * Parse a range or network from string notation.
+     *
+     * Dispatch order: wildcards → dash ranges → CIDR/dotted-netmask → single IP as /32 or /128.
+     *
      * @throws IpException
      */
     public static function range(string $input, int $flags = ParseFlags::DEFAULT): Range|Network
@@ -86,6 +108,9 @@ final class Parser
     }
 
     /**
+     * Auto-detect input type: returns ParsedAddress for single IPs,
+     * or Range/Network for ranges, CIDRs, wildcards, and dotted-netmask notation.
+     *
      * @throws IpException
      */
     public static function any(string $input, int $flags = ParseFlags::DEFAULT): ParsedAddress|Range|Network
@@ -104,6 +129,12 @@ final class Parser
     }
 
     /**
+     * Parse the address portion after port/zone extraction.
+     *
+     * Handles non-decimal formats (hex/binary/octal) and the legacy
+     * 2-part non-quad notation (`10.1` → `10.0.0.1`) before falling
+     * through to PHP's inet_pton via the IP constructor.
+     *
      * @throws IpException
      */
     private static function parseAddress(string $address, int $flags): IP
@@ -113,6 +144,7 @@ final class Parser
             throw new IpException('Invalid IP address format');
         }
 
+        // Non-decimal whole-address formats: 0xHEX, 0bBINARY, 0oOCTAL → long integer → IP
         if (self::hasFlag($flags, ParseFlags::ALLOW_NON_DECIMAL_IPV4)) {
             if (preg_match('/^0x([0-9a-fA-F]+)$/', $address, $matches) === 1) {
                 return IP::parseLong(self::baseToDecimalString($matches[1], 16));
@@ -127,6 +159,7 @@ final class Parser
             }
         }
 
+        // 2-part shorthand: "10.1" → "10.0.0.1" (first octet + last octet, middle zeroed)
         if (self::hasFlag($flags, ParseFlags::ALLOW_NON_QUAD_IPV4)
             && preg_match('/^\d+\.\d+$/', $address) === 1
         ) {
@@ -149,6 +182,15 @@ final class Parser
         return new IP($address);
     }
 
+    /**
+     * Convert wildcard notation like `192.168.*.*` to a CIDR network.
+     *
+     * Wildcards must be contiguous and trailing (no gaps like `192.*.1.*`).
+     * Each wildcard octet maps to 8 bits of host space, so the prefix length
+     * is simply (number of fixed octets) * 8.
+     *
+     * Returns null if the pattern is malformed or has non-trailing wildcards.
+     */
     private static function wildcardToNetwork(string $input): ?Network
     {
         if (preg_match('/^([0-9*]+)\.([0-9*]+)\.([0-9*]+)\.([0-9*]+)$/', $input) !== 1) {
@@ -161,6 +203,7 @@ final class Parser
             return null;
         }
 
+        // Validate: fixed octets must all come before the first wildcard
         foreach ($parts as $index => $part) {
             if ($part === '*') {
                 continue;
@@ -175,11 +218,13 @@ final class Parser
                 return null;
             }
 
+            // No fixed octets allowed after the first wildcard
             if ($index > $firstWildcardIndex) {
                 return null;
             }
         }
 
+        // All positions from firstWildcard onward must be wildcards
         for ($i = $firstWildcardIndex; $i < 4; $i++) {
             if ($parts[$i] !== '*') {
                 return null;
@@ -193,6 +238,11 @@ final class Parser
     }
 
     /**
+     * Convert a digit string in any base (2, 8, 16) to a decimal string.
+     *
+     * Uses bcmath for arbitrary precision so hex addresses like
+     * 0xFFFFFFFF (4294967295) don't overflow PHP's native int.
+     *
      * @return numeric-string
      */
     private static function baseToDecimalString(string $digits, int $base): string
