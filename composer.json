@@ -45,7 +45,10 @@
     "autoload": {
         "psr-4": {
             "IPTools\\": "src/"
-        }
+        },
+        "files": [
+            "src/compat.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
