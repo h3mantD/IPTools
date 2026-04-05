@@ -227,4 +227,171 @@ final class RangeTest extends TestCase
 
         Range::parse('10.0.0.1-10.0.0.10')->addressAt('1.5');
     }
+
+    // -------------------------------------------------------------------------
+    // getSpanNetwork
+    // -------------------------------------------------------------------------
+
+    public function test_get_span_network_exact_cidr(): void
+    {
+        $range = Range::parse('192.168.1.0-192.168.1.255');
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('192.168.1.0/24', (string) $span);
+    }
+
+    public function test_get_span_network_non_aligned(): void
+    {
+        // 10-35 spans a /26 (0-63)
+        $range = Range::parse('49.12.11.10-49.12.11.35');
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('49.12.11.0/26', (string) $span);
+    }
+
+    public function test_get_span_network_single_ip(): void
+    {
+        $range = Range::parse('10.0.0.1-10.0.0.1');
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('10.0.0.1/32', (string) $span);
+    }
+
+    public function test_get_span_network_adjacent_ips(): void
+    {
+        $range = Range::parse('10.0.0.0-10.0.0.1');
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('10.0.0.0/31', (string) $span);
+    }
+
+    public function test_get_span_network_ipv6(): void
+    {
+        $range = Range::parse('2001:db8::1-2001:db8::ff');
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('2001:db8::/120', (string) $span);
+    }
+
+    public function test_get_span_network_full_ipv4_space(): void
+    {
+        $range = new Range(new IP('0.0.0.0'), new IP('255.255.255.255'));
+        $span = $range->getSpanNetwork();
+
+        $this->assertSame('0.0.0.0/0', (string) $span);
+    }
+
+    // -------------------------------------------------------------------------
+    // contains() with Range and Network arguments
+    // -------------------------------------------------------------------------
+
+    public function test_contains_network_object(): void
+    {
+        $range = Range::parse('10.0.0.0-10.0.0.255');
+        $network = Network::parse('10.0.0.0/25');
+
+        $this->assertTrue($range->contains($network));
+    }
+
+    public function test_contains_network_object_outside(): void
+    {
+        $range = Range::parse('10.0.0.0-10.0.0.255');
+        $network = Network::parse('10.0.1.0/24');
+
+        $this->assertFalse($range->contains($network));
+    }
+
+    public function test_contains_range_object(): void
+    {
+        $outer = Range::parse('10.0.0.0-10.0.0.255');
+        $inner = Range::parse('10.0.0.10-10.0.0.20');
+
+        $this->assertTrue($outer->contains($inner));
+    }
+
+    public function test_contains_range_object_partially_overlapping(): void
+    {
+        $outer = Range::parse('10.0.0.0-10.0.0.100');
+        $inner = Range::parse('10.0.0.50-10.0.0.200');
+
+        $this->assertFalse($outer->contains($inner));
+    }
+
+    public function test_contains_ipv6_network(): void
+    {
+        $range = Range::parse('2001:db8::-2001:db8::ffff');
+        $network = Network::parse('2001:db8::/120');
+
+        $this->assertTrue($range->contains($network));
+    }
+
+    public function test_contains_ipv6_range(): void
+    {
+        $outer = Range::parse('2001:db8::-2001:db8::ffff');
+        $inner = Range::parse('2001:db8::10-2001:db8::20');
+
+        $this->assertTrue($outer->contains($inner));
+    }
+
+    // -------------------------------------------------------------------------
+    // Single-IP ranges
+    // -------------------------------------------------------------------------
+
+    public function test_single_ip_range_count(): void
+    {
+        $range = Range::parse('10.0.0.1-10.0.0.1');
+
+        $this->assertCount(1, $range);
+        $this->assertSame('1', $range->getCountPrecise());
+    }
+
+    public function test_single_ip_range_iteration(): void
+    {
+        $range = Range::parse('10.0.0.1-10.0.0.1');
+        $collected = [];
+        foreach ($range as $ip) {
+            $collected[] = (string) $ip;
+        }
+
+        $this->assertSame(['10.0.0.1'], $collected);
+    }
+
+    public function test_single_ip_range_get_networks(): void
+    {
+        $range = Range::parse('10.0.0.1-10.0.0.1');
+        $networks = $range->getNetworks();
+
+        $this->assertCount(1, $networks);
+        $this->assertSame('10.0.0.1/32', (string) $networks[0]);
+    }
+
+    // -------------------------------------------------------------------------
+    // setFirstIP / setLastIP validation
+    // -------------------------------------------------------------------------
+
+    public function test_set_last_ip_version_mismatch_throws(): void
+    {
+        $this->expectException(IPTools\Exception\RangeException::class);
+        $this->expectExceptionMessage('Last IP version does not match first IP version');
+
+        new Range(new IP('::1'), new IP('10.0.0.1'));
+    }
+
+    public function test_set_last_ip_less_than_first_via_constructor(): void
+    {
+        $this->expectException(IPTools\Exception\RangeException::class);
+        $this->expectExceptionMessage('Last IP is less than first');
+
+        new Range(new IP('10.0.0.10'), new IP('10.0.0.1'));
+    }
+
+    public function test_set_last_ip_less_than_first_throws(): void
+    {
+        $range = new Range(new IP('10.0.0.0'), new IP('10.0.0.10'));
+
+        $this->expectException(IPTools\Exception\RangeException::class);
+        $this->expectExceptionMessage('Last IP is less than first');
+
+        $range->setLastIP(new IP('9.0.0.0'));
+    }
 }

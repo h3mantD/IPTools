@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use IPTools\Enums\OverflowMode;
 use IPTools\IP;
-use IPTools\OverflowMode;
 use IPTools\Range;
 use PHPUnit\Framework\TestCase;
 
@@ -280,6 +280,93 @@ final class IPArithmeticTest extends TestCase
         $ip = new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff');
         $result = $ip->shift(128);
         $this->assertSame('::', (string) $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // shift — IPv6 left-shift overflow modes
+    // -------------------------------------------------------------------------
+
+    public function test_shift_ipv6_left_overflow_throws_by_default(): void
+    {
+        $this->expectException(OverflowException::class);
+        (new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'))->shift(-1);
+    }
+
+    public function test_shift_ipv6_left_overflow_null_mode(): void
+    {
+        $result = (new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'))->shift(-1, OverflowMode::NULL);
+        $this->assertNull($result);
+    }
+
+    public function test_shift_ipv6_left_overflow_clamp_mode(): void
+    {
+        $result = (new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'))->shift(-1, OverflowMode::CLAMP);
+        $this->assertSame('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', (string) $result);
+    }
+
+    public function test_shift_ipv6_left_overflow_wrap_mode(): void
+    {
+        // 0x8000...0 << 1 overflows, wraps to 0
+        $result = (new IP('8000::'))->shift(-1, OverflowMode::WRAP);
+        $this->assertSame('::', (string) $result);
+    }
+
+    public function test_shift_ipv6_left_no_overflow(): void
+    {
+        // ::1 << 4 = ::10
+        $result = (new IP('::1'))->shift(-4);
+        $this->assertSame('::10', (string) $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // previous — string offset for IPv6
+    // -------------------------------------------------------------------------
+
+    public function test_previous_large_string_offset_ipv6(): void
+    {
+        $ip = (new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'))
+            ->previous('340282366920938463463374607431768211454');
+        $this->assertSame('::1', (string) $ip);
+    }
+
+    public function test_previous_returns_null_at_boundary_with_large_offset(): void
+    {
+        // Stepping back from ::1 by 2 would underflow
+        $this->assertNull((new IP('::1'))->previous(2));
+    }
+
+    // -------------------------------------------------------------------------
+    // addOffset / shift — explicit OverflowMode::THROW
+    // -------------------------------------------------------------------------
+
+    public function test_add_offset_overflow_explicit_throw_mode(): void
+    {
+        $this->expectException(OverflowException::class);
+        (new IP('255.255.255.255'))->addOffset(1, OverflowMode::THROW);
+    }
+
+    public function test_add_offset_underflow_explicit_throw_mode(): void
+    {
+        $this->expectException(OverflowException::class);
+        (new IP('0.0.0.0'))->addOffset(-1, OverflowMode::THROW);
+    }
+
+    public function test_shift_left_overflow_explicit_throw_mode(): void
+    {
+        $this->expectException(OverflowException::class);
+        (new IP('255.255.255.255'))->shift(-1, OverflowMode::THROW);
+    }
+
+    // -------------------------------------------------------------------------
+    // parseLong — negative input
+    // -------------------------------------------------------------------------
+
+    public function test_parse_long_negative_throws(): void
+    {
+        $this->expectException(IPTools\Exception\IpException::class);
+        $this->expectExceptionMessage('Long IP address is out of range');
+
+        IP::parseLong('-1');
     }
 
     // -------------------------------------------------------------------------
