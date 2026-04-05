@@ -41,3 +41,6 @@ plan.md
 
 # Example apps (local testing only)
 /examples/
+
+# Superpowers plans (local only)
+/docs/superpowers/
