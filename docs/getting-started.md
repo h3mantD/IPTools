@@ -20,7 +20,7 @@ use IPTools\IP;
 $ip = new IP('192.168.1.1');
 
 echo $ip;                    // 192.168.1.1
-echo $ip->getVersion();      // IPv4
+echo $ip->getVersion()->value; // IPv4
 echo $ip->getMaxPrefixLength(); // 32
 ```
 
@@ -30,7 +30,7 @@ IPTools also handles IPv6 transparently:
 $ipv6 = new IP('2001:db8::1');
 
 echo $ipv6;                  // 2001:db8::1
-echo $ipv6->getVersion();    // IPv6
+echo $ipv6->getVersion()->value; // IPv6
 echo $ipv6->getMaxPrefixLength(); // 128
 ```
 

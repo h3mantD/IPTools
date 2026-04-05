@@ -149,7 +149,7 @@ The excluded subnet must be fully within the source network, or an exception is 
 ### Split Into Smaller Subnets
 
 ```php
-$subnets = Network::parse('192.168.0.0/22')->moveTo('24');
+$subnets = Network::parse('192.168.0.0/22')->moveTo(24);
 
 foreach ($subnets as $subnet) {
     echo $subnet . PHP_EOL;

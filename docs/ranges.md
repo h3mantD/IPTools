@@ -194,7 +194,7 @@ echo "Spans: {$range->getSpanNetwork()}";
 
 ## Troubleshooting
 
-### "Last IP version does not match first IP version"
+### "First/Last IP version does not match"
 
 Both endpoints must be the same version. You can't create a range from an IPv4 to an IPv6 address.
 
