@@ -1,39 +1,39 @@
 # API Reference
 
-Back to index: [Documentation Index](README.md)
+- [Documentation](README.md)
 
-This document is a quick lookup for the public API surface of IPTools classes.
-
-Use this reference when you already know the feature area and need signatures quickly. If you need conceptual guidance, start with the guide pages in `docs/README.md`.
+Quick lookup for every public method. For conceptual guidance and examples, see the guide pages linked in each section header.
 
 ## IPTools\IP
 
-Creation and parsing:
+> Guide: [IP Addresses](ip-addresses.md)
+
+**Creation and parsing:**
 
 - `__construct(string $ip)`
 - `static parse(int|string $ip): IP`
 - `static parseBin(string $binIP): IP`
 - `static parseHex(string $hexIP): IP`
-- `static parseLong(int|string $longIP, string $version = IP::IP_V4): IP`
+- `static parseLong(int|string $longIP, IPVersion|string $version = IPVersion::IPv4): IP`
 - `static parseInAddr(string $inAddr): IP`
 
-Representations:
+**Representations:**
 
 - `__toString(): string`
-- `inAddr(): string`
+- `inAddr(): string` — raw packed binary (advanced use)
 - `toBin(): string`
 - `toHex(): string`
 - `expanded(): string`
 - `toLong(): numeric-string`
 
-Metadata:
+**Version and metadata:**
 
-- `getVersion(): string`
+- `getVersion(): IPVersion`
 - `getMaxPrefixLength(): int`
 - `getOctetsCount(): int`
 - `getReversePointer(): string`
 
-Type helpers:
+**Type classification:**
 
 - `types(): IPType[]`
 - `primaryType(): IPType`
@@ -46,7 +46,7 @@ Type helpers:
 - `isDocumentation(): bool`
 - `isReserved(): bool`
 
-Transition helpers:
+**IPv4/IPv6 transition helpers:**
 
 - `isIpv4Mapped(): bool`
 - `is6to4(): bool`
@@ -58,10 +58,10 @@ Transition helpers:
 - `static toNat64(IP $ipv4, string $prefix = '64:ff9b::/96'): IP`
 - `static fromNat64(IP|string $ipv6, string $prefix = '64:ff9b::/96'): IP`
 
-Arithmetic:
+**Arithmetic:**
 
-- `compareTo(IP $other): int`
-- `distanceTo(IP $other): numeric-string`
+- `compareTo(IP $other): int` — returns -1, 0, or 1
+- `distanceTo(IP $other): numeric-string` — signed distance
 - `addOffset(int|string $delta, OverflowMode $mode = OverflowMode::THROW): ?IP`
 - `next(int|string $steps = 1): ?IP`
 - `previous(int|string $steps = 1): ?IP`
@@ -69,16 +69,18 @@ Arithmetic:
 
 ## IPTools\Network
 
-Core:
+> Guide: [Networks](networks.md)
+
+**Creation:**
 
 - `__construct(IP $ip, IP $netmask)`
-- `__toString(): string`
+- `__toString(): string` — returns CIDR notation
 - `static parse(string|IP|Network $data): Network`
-- `static prefix2netmask(int|string $prefixLength, string $version): IP`
+- `static prefix2netmask(int|string $prefixLength, IPVersion|string $version): IP`
 - `static netmask2prefix(IP $ip): int`
 - `static summarize(array $networks): Network[]`
 
-Getters and setters:
+**Properties:**
 
 - `setIP(IP $ip): void`
 - `setNetmask(IP $ip): void`
@@ -88,25 +90,26 @@ Getters and setters:
 - `getPrefixLength(): int`
 - `getCIDR(): string`
 
-Address helpers:
+**Address helpers:**
 
-- `getNetwork(): IP`
-- `getBroadcast(): IP`
+- `getNetwork(): IP` / `networkAddress(): IP`
+- `getBroadcast(): IP` / `broadcastAddress(): IP`
 - `getWildcard(): IP`
 - `getFirstIP(): IP`
 - `getLastIP(): IP`
-- `networkAddress(): IP`
-- `broadcastAddress(): IP`
 - `firstHost(): IP`
 - `lastHost(): IP`
 - `usableHostCount(): int|string`
 - `isPointToPoint(): bool`
+
+**Containment and navigation:**
+
 - `containsIP(IP|string $ip): bool`
 - `containsRange(Range|Network|IP|string $range): bool`
 - `nextSubnet(): ?Network`
 - `previousSubnet(): ?Network`
 
-Operations:
+**Operations:**
 
 - `exclude(string|IP|Network $exclude): Network[]`
 - `moveTo(int|string $prefixLength): Network[]`
@@ -115,30 +118,29 @@ Operations:
 - `getCountPrecise(): numeric-string`
 - `count(): int`
 
-Iterator methods:
-
-- `current(): IP`
-- `key(): int`
-- `next(): void`
-- `rewind(): void`
-- `valid(): bool`
+**Iterator:** `current(): IP`, `key(): int`, `next(): void`, `rewind(): void`, `valid(): bool`
 
 ## IPTools\Range
 
-Core:
+> Guide: [Ranges](ranges.md)
+
+**Creation:**
 
 - `__construct(IP $firstIP, IP $lastIP)`
 - `static parse(string $data): Range`
-- `contains(IP|Network|Range $find): bool`
 
-Getters and setters:
+**Endpoints:**
 
 - `setFirstIP(IP $ip): void`
 - `setLastIP(IP $ip): void`
 - `getFirstIP(): IP`
 - `getLastIP(): IP`
 
-Network decomposition:
+**Containment:**
+
+- `contains(IP|Network|Range $find): bool`
+
+**Network decomposition:**
 
 - `getNetworks(): Network[]`
 - `iterateNetworks(): Generator<Network>`
@@ -147,41 +149,37 @@ Network decomposition:
 - `getNthNetwork(int $index): ?Network`
 - `getSpanNetwork(): Network`
 
-Indexing and counting:
+**Indexing and counting:**
 
 - `addressAt(int|string $offset): ?IP`
 - `addressAtOrFail(int|string $offset): IP`
 - `getCountPrecise(): numeric-string`
 - `count(): int`
 
-Iterator methods:
-
-- `current(): IP`
-- `key(): int`
-- `next(): void`
-- `rewind(): void`
-- `valid(): bool`
+**Iterator:** `current(): IP`, `key(): int`, `next(): void`, `rewind(): void`, `valid(): bool`
 
 ## IPTools\RangeSet
 
-Core:
+> Guide: [Range Sets](range-sets.md)
+
+**Creation:**
 
 - `__construct(iterable $ranges = [])`
 - `static from(iterable $ranges): RangeSet`
 
-Set operations:
+**Set operations** (all accept `RangeSet|iterable|Range|Network|IP|string`):
 
 - `union(...): RangeSet`
 - `intersect(...): RangeSet`
 - `subtract(...): RangeSet`
 
-Queries:
+**Queries:**
 
 - `contains(IP $ip): bool`
 - `containsRange(Range|Network|IP|string $candidate): bool`
 - `overlaps(Range|Network|IP|string $candidate): bool`
 
-Exports:
+**Exports:**
 
 - `toCidrs(): Network[]`
 - `getRanges(): Range[]`
@@ -189,16 +187,41 @@ Exports:
 
 ## IPTools\Parser
 
+> Guide: [Parsing](parsing.md)
+
 - `static ip(string $input, int $flags = ParseFlags::DEFAULT): ParsedAddress`
 - `static range(string $input, int $flags = ParseFlags::DEFAULT): Range|Network`
 - `static any(string $input, int $flags = ParseFlags::DEFAULT): ParsedAddress|Range|Network`
 
-Related:
+## IPTools\ParseFlags
 
-- `ParseFlags` constants
-- `ParsedAddress` readonly DTO (`ip`, `port`, `zoneId`)
+> Guide: [Parsing](parsing.md)
 
-## Storage APIs
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `STRICT` | `0` | Accept only standard IP notation |
+| `ALLOW_PORT` | `1` | Accept port suffix |
+| `ALLOW_ZONE_ID` | `2` | Accept IPv6 zone identifiers |
+| `ALLOW_NON_DECIMAL_IPV4` | `4` | Accept hex/binary/octal IPv4 |
+| `ALLOW_NON_QUAD_IPV4` | `8` | Accept 2-part IPv4 shorthand |
+| `ALLOW_WILDCARDS` | `16` | Accept `*` octets |
+| `DEFAULT` | `23` | Port + Zone + NonDecimal + Wildcards |
+
+## IPTools\ParsedAddress
+
+> Guide: [Parsing](parsing.md)
+
+```php
+final readonly class ParsedAddress {
+    public IP $ip;
+    public ?int $port;
+    public ?string $zoneId;
+}
+```
+
+## Storage
+
+> Guide: [Database Storage](database-storage.md) | [Laravel Integration](laravel.md)
 
 ### IPTools\Storage\RangeStorageInterface
 
@@ -211,44 +234,40 @@ Related:
 ### IPTools\Storage\SqlRangeStorage
 
 - `__construct(PDO $pdo, string $table = 'ip_ranges')`
-- same interface methods as above
-
-### IPTools\Storage\AddressCodec
-
-- `static to16(IP $ip): string`
-- `static from16(string $bin, int $version): IP`
+- Implements `RangeStorageInterface`
 
 ### IPTools\Storage\LaravelRangeStorage
 
-- `__construct(Illuminate\Database\Connection $connection, string $table = 'ip_ranges')`
-- same interface methods as above
+- `__construct(Connection $connection, string $table = 'ip_ranges')`
+- Implements `RangeStorageInterface`
 
-## Laravel Integration Classes
+### IPTools\Storage\AddressCodec
 
-- `IPTools\IPToolsServiceProvider`
-- `IPTools\Models\IpRange`
-- `IPTools\Console\InstallCommand` (`iptools:install`)
+- `static to16(IP $ip): string` — encode to 16-byte binary
+- `static from16(string $bin, int $version): IP` — decode from 16-byte binary
 
 ## Enums
 
+### IPTools\Enums\IPVersion
+
+| Case | Value | `maxPrefixLength()` | `octets()` | `maxLong()` |
+|------|-------|--------------------:|----------:|-------------|
+| `IPv4` | `'IPv4'` | 32 | 4 | `'4294967295'` |
+| `IPv6` | `'IPv6'` | 128 | 16 | `'340282366920938463463374607431768211455'` |
+
+- `toInt(): int` — returns `4` or `6`
+- `static resolve(self|string $version): self` — resolve from string for backward compatibility
+
 ### IPTools\Enums\IPType
 
-- `UNSPECIFIED`
-- `LOOPBACK`
-- `BROADCAST`
-- `MULTICAST`
-- `LINK_LOCAL`
-- `DOCUMENTATION`
-- `BENCHMARKING`
-- `CGNAT`
-- `PRIVATE`
-- `UNIQUE_LOCAL`
-- `RESERVED`
-- `GLOBAL`
+`UNSPECIFIED`, `LOOPBACK`, `BROADCAST`, `MULTICAST`, `LINK_LOCAL`, `DOCUMENTATION`, `BENCHMARKING`, `CGNAT`, `PRIVATE`, `UNIQUE_LOCAL`, `RESERVED`, `GLOBAL`
 
 ### IPTools\Enums\OverflowMode
 
-- `THROW`
-- `NULL`
-- `WRAP`
-- `CLAMP`
+`THROW`, `NULL`, `WRAP`, `CLAMP`
+
+## Laravel Classes
+
+- `IPTools\IPToolsServiceProvider` — auto-discovered service provider
+- `IPTools\Models\IpRange` — optional Eloquent model
+- `IPTools\Console\InstallCommand` — `php artisan iptools:install`

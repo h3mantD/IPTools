@@ -1,28 +1,40 @@
 # Laravel Integration
 
-Back to index: [Documentation Index](README.md)
+- [Documentation](README.md)
 
-IPTools includes optional Laravel integration for database-backed range storage. The integration registers a service provider, publishes package assets, and binds the storage interface into Laravel's container.
+IPTools includes optional Laravel integration that wires the database storage layer into Laravel's service container, migrations, and Artisan. If you don't use Laravel, see the [Database Storage](database-storage.md) guide for standalone PDO usage.
 
 ## Installation
-
-Install the package via Composer:
 
 ```bash
 composer require h3mantd/iptools
 ```
 
-If package discovery is disabled in your application, register `IPTools\IPToolsServiceProvider` manually.
+> **Note:** The service provider is registered automatically via package discovery. If you've disabled auto-discovery, add `IPTools\IPToolsServiceProvider::class` to your `providers` array in `config/app.php`.
 
-## Configuration
+## Quick Setup
 
-Publish the configuration file:
+The fastest way to get everything set up:
+
+```bash
+php artisan iptools:install
+```
+
+This single command publishes the config file, migration, optional Eloquent model, and runs the migration. You're ready to go.
+
+> **Tip:** Use `--force` to overwrite previously published files, or `--no-migrate` if you want to review the migration before running it.
+
+## Step-By-Step Setup
+
+If you prefer to control each step:
+
+### 1. Publish Configuration
 
 ```bash
 php artisan vendor:publish --tag=iptools-config
 ```
 
-The published file contains the storage connection and table options:
+This creates `config/iptools.php`:
 
 ```php
 return [
@@ -33,24 +45,28 @@ return [
 ];
 ```
 
-## Migrations
+Set `IPTOOLS_DB_CONNECTION` in your `.env` to use a specific database connection. Leave it unset to use Laravel's default connection.
 
-Publish the package migrations and run them:
+### 2. Publish and Run Migrations
 
 ```bash
 php artisan vendor:publish --tag=iptools-migrations
 php artisan migrate
 ```
 
-You may also run the installer command to publish all package assets and run migrations in one step:
+This creates the `ip_ranges` table with the correct schema for your database driver.
+
+### 3. Publish the Model (Optional)
 
 ```bash
-php artisan iptools:install
+php artisan vendor:publish --tag=iptools-model
 ```
+
+This creates `app/Models/IpRange.php` — a customizable Eloquent model for the `ip_ranges` table. You only need this if you want to query the table with Eloquent directly.
 
 ## Using the Storage Interface
 
-After installation, resolve `IPTools\Storage\RangeStorageInterface` from the container:
+After setup, resolve `RangeStorageInterface` from the container:
 
 ```php
 use IPTools\IP;
@@ -59,68 +75,137 @@ use IPTools\Storage\RangeStorageInterface;
 
 $storage = app(RangeStorageInterface::class);
 
-$storage->store(Network::parse('10.24.0.0/16'), [
+// Store a range with metadata
+$storage->store(Network::parse('10.0.0.0/24'), [
     'policy' => 'allow',
     'source' => 'admin-ui',
 ]);
 
-$contains = $storage->contains(new IP('10.24.5.10')); // true
+// Check if an IP is in any stored range
+$storage->contains(new IP('10.0.0.42')); // true
 
-foreach ($storage->findContaining(new IP('10.24.5.10')) as $row) {
-    $range = $row['range'];
-    $metadata = $row['metadata'];
+// Find all ranges containing an IP
+foreach ($storage->findContaining(new IP('10.0.0.42')) as $match) {
+    echo $match['metadata']['policy']; // 'allow'
+}
+
+// Delete a range
+$storage->delete(Network::parse('10.0.0.0/24'));
+
+// Count stored ranges
+echo $storage->count();
+```
+
+You can also type-hint the interface in your controllers and services for dependency injection:
+
+```php
+use IPTools\Storage\RangeStorageInterface;
+
+class FirewallController extends Controller
+{
+    public function check(Request $request, RangeStorageInterface $storage)
+    {
+        $clientIP = new IP($request->ip());
+
+        if (! $storage->contains($clientIP)) {
+            abort(403, 'IP not in allowed ranges');
+        }
+
+        // proceed
+    }
 }
 ```
 
-The `findContaining` method returns rows in the following shape:
+## Practical Example: IP-Based Middleware
 
 ```php
-[
-    'range' => IPTools\Range,
-    'metadata' => array<string, mixed>,
-]
+namespace App\Http\Middleware;
+
+use Closure;
+use IPTools\IP;
+use IPTools\Storage\RangeStorageInterface;
+
+class AllowListedIPs
+{
+    public function __construct(
+        private readonly RangeStorageInterface $storage,
+    ) {}
+
+    public function handle($request, Closure $next)
+    {
+        $clientIP = new IP($request->ip());
+
+        if (! $this->storage->contains($clientIP)) {
+            abort(403, 'Access denied');
+        }
+
+        return $next($request);
+    }
+}
 ```
-
-## Publishing the Optional Model Stub
-
-If you prefer querying the table with Eloquent directly, publish the model stub:
-
-```bash
-php artisan vendor:publish --tag=iptools-model
-```
-
-This publishes `app/Models/IpRange.php`, which you can customize for your application.
 
 ## Direct Adapter Usage
 
-If you want explicit control over connection and table at runtime, instantiate the adapter directly:
+If you need explicit control over the connection or table name at runtime:
 
 ```php
 use Illuminate\Support\Facades\DB;
 use IPTools\Storage\LaravelRangeStorage;
 
-$storage = new LaravelRangeStorage(DB::connection(), 'ip_ranges');
+$storage = new LaravelRangeStorage(DB::connection('mysql'), 'custom_ip_ranges');
 ```
+
+The `LaravelRangeStorage` adapter bridges Laravel's `Connection` to the underlying `SqlRangeStorage`. It handles PDO reconnects transparently.
 
 ## Troubleshooting
 
-### Table is not available
+### "Table 'ip_ranges' is not available"
 
-Publish migrations and run them:
+The migration hasn't been run. Publish and migrate:
 
 ```bash
 php artisan vendor:publish --tag=iptools-migrations
 php artisan migrate
 ```
 
-### RangeStorageInterface does not resolve
+Or use the installer: `php artisan iptools:install`
 
-Ensure package auto-discovery is enabled, or register `IPTools\IPToolsServiceProvider` manually.
+### RangeStorageInterface Does Not Resolve
 
-### Incorrect database connection or table is used
+The service provider isn't registered. Check that:
 
-Verify `IPTOOLS_DB_CONNECTION` and `IPTOOLS_RANGES_TABLE`, then clear cached configuration:
+1. Package auto-discovery is enabled in your `composer.json` (the default)
+2. Or `IPTools\IPToolsServiceProvider::class` is in your `providers` array
+
+Then clear the bootstrap cache:
 
 ```bash
-php artisan config:clear
+php artisan clear-compiled
 ```
+
+### Wrong Database Connection
+
+If ranges are being stored in the wrong database, set the `IPTOOLS_DB_CONNECTION` environment variable in your `.env`:
+
+```env
+IPTOOLS_DB_CONNECTION=mysql_secondary
+```
+
+> **Warning:** After changing environment variables, clear the config cache:
+> ```bash
+> php artisan config:clear
+> ```
+
+### Table Name Mismatch
+
+If you customized the table name, make sure both the migration and config use the same name:
+
+```env
+IPTOOLS_RANGES_TABLE=my_ip_ranges
+```
+
+## What's Next?
+
+- **[Database Storage](database-storage.md)** — Standalone PDO usage, schema details, and encoding internals
+- **[Getting Started](getting-started.md)** — Core library features without Laravel
+- **[API Reference](api-reference.md)** — Full method listing for storage classes

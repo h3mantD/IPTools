@@ -34,18 +34,12 @@ or put in composer.json:
 
 ## Usage
 
-For full documentation, see `docs/README.md`.
+## Documentation
 
-Detailed guides:
+- **[Getting Started](docs/getting-started.md)** — Installation and quick examples
+- **[Full Documentation](docs/README.md)** — All guides, API reference, and learning path
 
-- [IP Guide](docs/ip.md)
-- [Parser Guide](docs/parser.md)
-- [Network Guide](docs/network.md)
-- [Range Guide](docs/range.md)
-- [RangeSet Guide](docs/rangeset.md)
-- [Storage Guide](docs/storage.md)
-- [Laravel Integration Guide](docs/laravel.md)
-- [API Reference](docs/api-reference.md)
+Key guides: [IP Addresses](docs/ip-addresses.md) | [Networks](docs/networks.md) | [Ranges](docs/ranges.md) | [Range Sets](docs/range-sets.md) | [Parsing](docs/parsing.md) | [Database Storage](docs/database-storage.md) | [Laravel](docs/laravel.md) | [API Reference](docs/api-reference.md)
 
 ### IP Operations
 
