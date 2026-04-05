@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace IPTools;
 
 use Countable;
+use IPTools\Enums\IPVersion;
 
 /**
- * Canonical set of disjoint/merged IP ranges.
+ * Canonical set of disjoint, non-overlapping IP ranges.
+ *
+ * On construction, overlapping and adjacent input ranges are automatically
+ * merged (normalized) so that the internal representation is always minimal.
+ * IPv4 and IPv6 ranges are stored separately and never interact.
+ *
+ * Supports set algebra: union, intersect, subtract.
  */
 final class RangeSet implements Countable
 {
@@ -15,8 +22,8 @@ final class RangeSet implements Countable
      * @var array<string, array<int, Range>>
      */
     private array $rangesByVersion = [
-        IP::IP_V4 => [],
-        IP::IP_V6 => [],
+        IPVersion::IPv4->value => [],
+        IPVersion::IPv6->value => [],
     ];
 
     /**
@@ -26,12 +33,12 @@ final class RangeSet implements Countable
     {
         foreach ($ranges as $range) {
             $parsed = $this->parseItem($range);
-            $version = $parsed->getFirstIP()->getVersion();
+            $version = $parsed->getFirstIP()->getVersion()->value;
             $this->rangesByVersion[$version][] = $parsed;
         }
 
-        $this->rangesByVersion[IP::IP_V4] = $this->normalize($this->rangesByVersion[IP::IP_V4]);
-        $this->rangesByVersion[IP::IP_V6] = $this->normalize($this->rangesByVersion[IP::IP_V6]);
+        $this->rangesByVersion[IPVersion::IPv4->value] = $this->normalize($this->rangesByVersion[IPVersion::IPv4->value]);
+        $this->rangesByVersion[IPVersion::IPv6->value] = $this->normalize($this->rangesByVersion[IPVersion::IPv6->value]);
     }
 
     /**
@@ -56,6 +63,11 @@ final class RangeSet implements Countable
     }
 
     /**
+     * Set intersection: returns only the address space common to both sets.
+     *
+     * Uses a two-pointer sweep over sorted ranges (the normalization invariant
+     * guarantees sorted, non-overlapping ranges within each version).
+     *
      * @param  RangeSet|iterable<int, Range|Network|IP|string>|Range|Network|IP|string  $other
      */
     public function intersect(self|iterable|Range|Network|IP|string $other): self
@@ -63,10 +75,11 @@ final class RangeSet implements Countable
         $otherSet = $other instanceof self ? $other : new self($this->parseInput($other));
         $result = [];
 
-        foreach ([IP::IP_V4, IP::IP_V6] as $version) {
+        foreach ([IPVersion::IPv4->value, IPVersion::IPv6->value] as $version) {
             $left = $this->rangesByVersion[$version];
             $right = $otherSet->rangesByVersion[$version];
 
+            // Two-pointer sweep: both arrays are sorted, advance the one that ends earlier
             $i = 0;
             $j = 0;
             while ($i < count($left) && $j < count($right)) {
@@ -108,7 +121,7 @@ final class RangeSet implements Countable
         $otherSet = $other instanceof self ? $other : new self($this->parseInput($other));
         $result = [];
 
-        foreach ([IP::IP_V4, IP::IP_V6] as $version) {
+        foreach ([IPVersion::IPv4->value, IPVersion::IPv6->value] as $version) {
             $remaining = $this->rangesByVersion[$version];
             $subtractors = $otherSet->rangesByVersion[$version];
 
@@ -137,7 +150,7 @@ final class RangeSet implements Countable
 
     public function contains(IP $ip): bool
     {
-        foreach ($this->rangesByVersion[$ip->getVersion()] as $range) {
+        foreach ($this->rangesByVersion[$ip->getVersion()->value] as $range) {
             if ($range->contains($ip)) {
                 return true;
             }
@@ -149,7 +162,7 @@ final class RangeSet implements Countable
     public function containsRange(Range|Network|IP|string $candidate): bool
     {
         $range = $this->parseItem($candidate);
-        foreach ($this->rangesByVersion[$range->getFirstIP()->getVersion()] as $container) {
+        foreach ($this->rangesByVersion[$range->getFirstIP()->getVersion()->value] as $container) {
             if ($container->contains($range)) {
                 return true;
             }
@@ -161,7 +174,7 @@ final class RangeSet implements Countable
     public function overlaps(Range|Network|IP|string $candidate): bool
     {
         $range = $this->parseItem($candidate);
-        $version = $range->getFirstIP()->getVersion();
+        $version = $range->getFirstIP()->getVersion()->value;
 
         foreach ($this->rangesByVersion[$version] as $existing) {
             if (self::compareIp($existing->getLastIP(), $range->getFirstIP()) < 0) {
@@ -194,12 +207,12 @@ final class RangeSet implements Countable
      */
     public function getRanges(): array
     {
-        return array_merge($this->rangesByVersion[IP::IP_V4], $this->rangesByVersion[IP::IP_V6]);
+        return array_merge($this->rangesByVersion[IPVersion::IPv4->value], $this->rangesByVersion[IPVersion::IPv6->value]);
     }
 
     public function count(): int
     {
-        return count($this->rangesByVersion[IP::IP_V4]) + count($this->rangesByVersion[IP::IP_V6]);
+        return count($this->rangesByVersion[IPVersion::IPv4->value]) + count($this->rangesByVersion[IPVersion::IPv6->value]);
     }
 
     private static function compareIp(IP $a, IP $b): int
@@ -252,6 +265,10 @@ final class RangeSet implements Countable
         return array_values($normalized);
     }
 
+    /**
+     * Check if two ranges overlap or are immediately adjacent (e.g., 10.0.0.10 and 10.0.0.11).
+     * Adjacent ranges should be merged during normalization to maintain the minimal representation.
+     */
     private function touchesOrOverlaps(Range $left, Range $right): bool
     {
         if (self::compareIp($right->getFirstIP(), $left->getLastIP()) <= 0) {

@@ -5,11 +5,22 @@ declare(strict_types=1);
 namespace IPTools;
 
 use Countable;
+use IPTools\Enums\IPVersion;
 use IPTools\Exception\NetworkException;
 use Iterator;
 use Stringable;
 
 /**
+ * Represents a CIDR network (an IP address paired with a netmask).
+ *
+ * The netmask determines the network/host boundary. Internally, all
+ * operations use binary string comparison on the packed inet_pton form,
+ * which handles both IPv4 and IPv6 uniformly.
+ *
+ * Implements Iterator to enumerate every IP in the network, and Countable
+ * for the total address count. Use getCountPrecise() for large IPv6 blocks
+ * that exceed PHP_INT_MAX.
+ *
  * @author Safarov Alisher <alisher.safarov@outlook.com>
  *
  * @link https://github.com/S1lentium/IPTools
@@ -18,15 +29,12 @@ use Stringable;
  */
 class Network implements Countable, Iterator, Stringable
 {
+    use IPIteratorTrait;
     use PropertyTrait;
 
     private ?IP $ip = null;
 
     private ?IP $netmask = null;
-
-    private int $position = 0;
-
-    private ?IP $currentIP = null;
 
     public function __construct(IP $ip, IP $netmask)
     {
@@ -39,12 +47,17 @@ class Network implements Countable, Iterator, Stringable
         return $this->getCIDR();
     }
 
+    /**
+     * Parse from CIDR (`10.0.0.0/24`), dotted netmask (`10.0.0.0 255.255.255.0`),
+     * or bare IP (treated as /32 or /128).
+     */
     public static function parse(string|IP|self $data): self
     {
         if ($data instanceof self) {
             return $data;
         }
 
+        // Bare IP → single-host network (/32 or /128)
         if ($data instanceof IP) {
             return new self($data, self::prefix2netmask($data->getMaxPrefixLength(), $data->getVersion()));
         }
@@ -53,6 +66,7 @@ class Network implements Countable, Iterator, Stringable
             $ip = IP::parse($matches[1]);
             $netmask = self::prefix2netmask((int) $matches[2], $ip->getVersion());
         } elseif (str_contains($data, ' ')) {
+            // Space-separated: "IP NETMASK" (dotted decimal netmask)
             [$ip, $netmask] = explode(' ', $data, 2);
             $ip = IP::parse($ip);
             $netmask = IP::parse($netmask);
@@ -65,17 +79,17 @@ class Network implements Countable, Iterator, Stringable
     }
 
     /**
+     * Build a netmask IP from a prefix length (e.g., 24 → 255.255.255.0).
+     *
+     * Constructs a binary string of `prefixLength` ones followed by zeros,
+     * then parses it as an IP address.
+     *
      * @throws NetworkException
      */
-    public static function prefix2netmask(int|string $prefixLength, string $version): IP
+    public static function prefix2netmask(int|string $prefixLength, IPVersion|string $version): IP
     {
-        if (! in_array($version, [IP::IP_V4, IP::IP_V6])) {
-            throw new NetworkException('Wrong IP version');
-        }
-
-        $maxPrefixLength = $version === IP::IP_V4
-            ? IP::IP_V4_MAX_PREFIX_LENGTH
-            : IP::IP_V6_MAX_PREFIX_LENGTH;
+        $version = IPVersion::resolve($version);
+        $maxPrefixLength = $version->maxPrefixLength();
 
         if (! is_numeric($prefixLength)
             || ! ($prefixLength >= 0 && $prefixLength <= $maxPrefixLength)
@@ -88,12 +102,25 @@ class Network implements Countable, Iterator, Stringable
         return IP::parseBin($binIP);
     }
 
+    /**
+     * Derive prefix length from a netmask (e.g., 255.255.255.0 → 24).
+     *
+     * Counts the leading '1' bits by stripping trailing '0's from the binary form.
+     */
     public static function netmask2prefix(IP $ip): int
     {
         return strlen(rtrim($ip->toBin(), '0'));
     }
 
     /**
+     * Merge an array of networks into the minimal equivalent CIDR set.
+     *
+     * Two-phase algorithm:
+     *   1. **Normalize** — sort by start address, remove networks already
+     *      contained within a preceding (wider) network.
+     *   2. **Collapse** — repeatedly merge adjacent same-prefix siblings
+     *      into their parent supernet until no more merges are possible.
+     *
      * @param  array<int, string|self>  $networks
      * @return Network[]
      */
@@ -114,12 +141,13 @@ class Network implements Countable, Iterator, Stringable
             return $first->getPrefixLength() <=> $second->getPrefixLength();
         });
 
+        // Phase 1: Remove networks fully contained within a preceding wider network
         $normalized = [];
         foreach ($parsedNetworks as $network) {
             $lastNormalized = $normalized[count($normalized) - 1] ?? null;
 
             if ($lastNormalized instanceof self
-                && self::containsNetwork($lastNormalized, $network)
+                && $lastNormalized->containsRange($network)
             ) {
                 continue;
             }
@@ -127,6 +155,8 @@ class Network implements Countable, Iterator, Stringable
             $normalized[] = $network;
         }
 
+        // Phase 2: Merge adjacent sibling networks (e.g., /25 + /25 → /24)
+        // Repeat until stable because one merge may enable further merges.
         do {
             $changed = false;
             $collapsed = [];
@@ -254,14 +284,22 @@ class Network implements Countable, Iterator, Stringable
         return $this->getBroadcast();
     }
 
+    /**
+     * First usable host address.
+     *
+     * IPv6 networks have no broadcast concept, so the network address itself is usable.
+     * IPv4 /31 (point-to-point, RFC 3021) and /32 are also fully usable.
+     * For standard IPv4 (/30 and wider), the first host is network + 1.
+     */
     public function firstHost(): IP
     {
         $network = $this->getNetwork();
 
-        if ($this->getIP()->getVersion() === IP::IP_V6) {
+        if ($this->getIP()->getVersion() === IPVersion::IPv6) {
             return $network;
         }
 
+        // /31 (point-to-point per RFC 3021) and /32 use all addresses
         if ($this->getPrefixLength() >= 31) {
             return $network;
         }
@@ -269,11 +307,17 @@ class Network implements Countable, Iterator, Stringable
         return $network->next() ?? throw new NetworkException('Unable to calculate first host address');
     }
 
+    /**
+     * Last usable host address.
+     *
+     * For standard IPv4 networks (/30 and wider), the broadcast address is
+     * excluded, so the last host is broadcast - 1.
+     */
     public function lastHost(): IP
     {
         $broadcast = $this->getBroadcast();
 
-        if ($this->getIP()->getVersion() === IP::IP_V6) {
+        if ($this->getIP()->getVersion() === IPVersion::IPv6) {
             return $broadcast;
         }
 
@@ -286,13 +330,15 @@ class Network implements Countable, Iterator, Stringable
 
     /**
      * Returns usable address count.
-     * IPv4 /31 and /32 are treated as fully usable.
-     * IPv6 has no broadcast reservation, so all addresses are usable.
+     *
+     * IPv4: blockSize - 2 (network + broadcast) for /30 and wider.
+     *        /31 (RFC 3021) and /32 are fully usable.
+     * IPv6: all addresses are usable (no broadcast concept).
      */
     public function usableHostCount(): string|int
     {
         $blockSize = $this->getBlockSize();
-        if ($this->getIP()->getVersion() === IP::IP_V6) {
+        if ($this->getIP()->getVersion() === IPVersion::IPv6) {
             return $blockSize;
         }
 
@@ -311,11 +357,11 @@ class Network implements Countable, Iterator, Stringable
 
     public function isPointToPoint(): bool
     {
-        if ($this->getIP()->getVersion() === IP::IP_V4 && $this->getPrefixLength() === 31) {
+        if ($this->getIP()->getVersion() === IPVersion::IPv4 && $this->getPrefixLength() === 31) {
             return true;
         }
 
-        return $this->getIP()->getVersion() === IP::IP_V6 && $this->getPrefixLength() === 127;
+        return $this->getIP()->getVersion() === IPVersion::IPv6 && $this->getPrefixLength() === 127;
     }
 
     public function containsIP(IP|string $ip): bool
@@ -354,7 +400,7 @@ class Network implements Countable, Iterator, Stringable
         $step = (string) $this->getBlockSize();
         /** @var numeric-string $step */
         $version = $this->getIP()->getVersion();
-        $max = $version === IP::IP_V4 ? IP::IP_V4_MAX_LONG : IP::IP_V6_MAX_LONG;
+        $max = $version->maxLong();
         $nextLong = bcadd($this->getNetwork()->toLong(), $step);
         if (bccomp($nextLong, $max) > 0) {
             return null;
@@ -392,20 +438,27 @@ class Network implements Countable, Iterator, Stringable
         $maxPrefixLength = $ip->getMaxPrefixLength();
         $prefixLength = $this->getPrefixLength();
 
-        if ($ip->getVersion() === IP::IP_V6) {
+        if ($ip->getVersion() === IPVersion::IPv6) {
             return bcpow('2', (string) ($maxPrefixLength - $prefixLength));
         }
 
         return 2 ** ($maxPrefixLength - $prefixLength);
     }
 
+    /**
+     * Range of usable host addresses (excludes network + broadcast for standard IPv4).
+     *
+     * For IPv4 blocks > 2 addresses: sets the last bit of the first address to 1
+     * (network + 1) and the last bit of the broadcast to 0 (broadcast - 1).
+     */
     public function getHosts(): Range
     {
         $firstHost = $this->getNetwork();
         $lastHost = $this->getBroadcast();
         $ip = $this->getIP();
 
-        if ($ip->getVersion() === IP::IP_V4 && $this->getBlockSize() > 2) {
+        if ($ip->getVersion() === IPVersion::IPv4 && $this->getBlockSize() > 2) {
+            // Flip last bit: network address → first usable, broadcast → last usable
             $firstHost = IP::parseBin(substr($firstHost->toBin(), 0, $firstHost->getMaxPrefixLength() - 1).'1');
             $lastHost = IP::parseBin(substr($lastHost->toBin(), 0, $lastHost->getMaxPrefixLength() - 1).'0');
         }
@@ -414,6 +467,15 @@ class Network implements Countable, Iterator, Stringable
     }
 
     /**
+     * Remove a subnet from this network, returning the remaining fragments.
+     *
+     * Uses a binary halving strategy: split the network into two halves,
+     * keep the half that doesn't contain the exclude target, then repeat
+     * on the matching half until we reach the exclude's prefix length.
+     *
+     * Example: excluding 10.0.0.128/26 from 10.0.0.0/24 returns
+     *          [10.0.0.0/25, 10.0.0.192/26].
+     *
      * @return Network[]
      *
      * @throws NetworkException
@@ -432,6 +494,7 @@ class Network implements Countable, Iterator, Stringable
 
         $networks = [];
 
+        // Start by splitting the current network into two halves (prefix + 1)
         $newPrefixLength = $this->getPrefixLength() + 1;
         if ($newPrefixLength > $ip->getMaxPrefixLength()) {
             return $networks;
@@ -448,6 +511,7 @@ class Network implements Countable, Iterator, Stringable
 
         $upper->setIP($upperFirstIP);
 
+        // At each level: keep the non-matching half, subdivide the matching half
         while ($newPrefixLength <= $exclude->getPrefixLength()) {
             $range = new Range($lower->getFirstIP(), $lower->getLastIP());
             if ($range->contains($exclude)) {
@@ -480,6 +544,10 @@ class Network implements Countable, Iterator, Stringable
     }
 
     /**
+     * Split this network into subnets of the given (longer) prefix length.
+     *
+     * Example: 192.168.0.0/22 → moveTo(24) → [/24, /24, /24, /24].
+     *
      * @return Network[]
      *
      * @throws NetworkException
@@ -519,50 +587,6 @@ class Network implements Countable, Iterator, Stringable
         return $networks;
     }
 
-    public function current(): IP
-    {
-        if (! $this->currentIP instanceof IP) {
-            $ip = $this->getFirstIP()->next($this->position);
-            if (! $ip instanceof IP) {
-                throw new NetworkException('Iterator position is out of range');
-            }
-
-            $this->currentIP = $ip;
-        }
-
-        return $this->currentIP;
-    }
-
-    public function key(): int
-    {
-        return $this->position;
-    }
-
-    public function next(): void
-    {
-        $this->position++;
-
-        if ($this->currentIP instanceof IP) {
-            $this->currentIP = $this->currentIP->next(); // ?IP; null signals boundary
-        }
-    }
-
-    public function rewind(): void
-    {
-        $this->position = 0;
-        $this->currentIP = null;
-    }
-
-    public function valid(): bool
-    {
-        // next() set currentIP to null when the address-space boundary was reached
-        if (! $this->currentIP instanceof IP && $this->position > 0) {
-            return false;
-        }
-
-        return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
-    }
-
     public function getCountPrecise(): string
     {
         return (string) $this->getBlockSize();
@@ -590,16 +614,13 @@ class Network implements Countable, Iterator, Stringable
         return max(0, (int) $count);
     }
 
-    private static function containsNetwork(self $container, self $contained): bool
-    {
-        if ($container->getIP()->getVersion() !== $contained->getIP()->getVersion()) {
-            return false;
-        }
-
-        return strcmp($contained->getFirstIP()->inAddr(), $container->getFirstIP()->inAddr()) >= 0
-            && strcmp($contained->getLastIP()->inAddr(), $container->getLastIP()->inAddr()) <= 0;
-    }
-
+    /**
+     * Attempt to merge two adjacent sibling networks into their parent supernet.
+     *
+     * Returns the merged supernet if both networks have the same prefix length,
+     * are truly adjacent (left's last + 1 == right's first), and together form
+     * a valid supernet (prefix - 1). Returns null otherwise.
+     */
     private static function tryMergeAdjacent(self $left, self $right): ?self
     {
         if ($left->getIP()->getVersion() !== $right->getIP()->getVersion()) {

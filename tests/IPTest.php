@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use IPTools\Enums\IPVersion;
 use IPTools\IP;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -103,14 +104,14 @@ final class IPTest extends TestCase
         $ipv6 = new IP($ipv6String);
 
         $this->assertEquals(inet_pton($ipv4String), $ipv4->inAddr());
-        $this->assertEquals(IP::IP_V4, $ipv4->getVersion());
-        $this->assertEquals(IP::IP_V4_MAX_PREFIX_LENGTH, $ipv4->getMaxPrefixLength());
-        $this->assertEquals(IP::IP_V4_OCTETS, $ipv4->getOctetsCount());
+        $this->assertSame(IPVersion::IPv4, $ipv4->getVersion());
+        $this->assertSame(32, $ipv4->getMaxPrefixLength());
+        $this->assertSame(4, $ipv4->getOctetsCount());
 
         $this->assertEquals(inet_pton($ipv6String), $ipv6->inAddr());
-        $this->assertEquals(IP::IP_V6, $ipv6->getVersion());
-        $this->assertEquals(IP::IP_V6_MAX_PREFIX_LENGTH, $ipv6->getMaxPrefixLength());
-        $this->assertEquals(IP::IP_V6_OCTETS, $ipv6->getOctetsCount());
+        $this->assertSame(IPVersion::IPv6, $ipv6->getVersion());
+        $this->assertSame(128, $ipv6->getMaxPrefixLength());
+        $this->assertSame(16, $ipv6->getOctetsCount());
     }
 
     #[DataProvider('getTestConstructorExceptionData')]
@@ -142,6 +143,30 @@ final class IPTest extends TestCase
         $this->assertNotEmpty($ip->bin);
         $this->assertNotEmpty($ip->long);
         $this->assertNotEmpty($ip->hex);
+    }
+
+    public function test_magic_properties_equal_method_results(): void
+    {
+        $ip = new IP('127.0.0.1');
+
+        $this->assertSame($ip->getMaxPrefixLength(), $ip->maxPrefixLength);
+        $this->assertSame($ip->getOctetsCount(), $ip->octetsCount);
+        $this->assertSame($ip->getReversePointer(), $ip->reversePointer);
+        $this->assertSame($ip->toBin(), $ip->bin);
+        $this->assertSame($ip->toLong(), $ip->long);
+        $this->assertSame($ip->toHex(), $ip->hex);
+        $this->assertSame($ip->expanded(), $ip->expanded);
+    }
+
+    public function test_magic_properties_ipv6(): void
+    {
+        $ip = new IP('2001:db8::1');
+
+        $this->assertSame(128, $ip->maxPrefixLength);
+        $this->assertSame(16, $ip->octetsCount);
+        $this->assertSame($ip->toBin(), $ip->bin);
+        $this->assertSame($ip->toLong(), $ip->long);
+        $this->assertSame($ip->toHex(), $ip->hex);
     }
 
     #[DataProvider('getToStringData')]
@@ -181,7 +206,7 @@ final class IPTest extends TestCase
         $ipv4 = IP::parseLong($ipv4long);
 
         $ipv6Long = '340277174624079928635746076935438991360';
-        $ipv6 = IP::parseLong($ipv6Long, IP::IP_V6);
+        $ipv6 = IP::parseLong($ipv6Long, IPVersion::IPv6);
 
         $this->assertEquals('127.0.0.1', (string) $ipv4);
         $this->assertEquals($ipv4long, $ipv4->toLong());
@@ -203,13 +228,12 @@ final class IPTest extends TestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Long IP address is out of range');
 
-        IP::parseLong('340282366920938463463374607431768211456', IP::IP_V6);
+        IP::parseLong('340282366920938463463374607431768211456', IPVersion::IPv6);
     }
 
     public function test_parse_long_invalid_version_throws(): void
     {
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Wrong IP version');
+        $this->expectException(ValueError::class);
 
         IP::parseLong('1', 'invalid-version');
     }

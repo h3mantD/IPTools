@@ -5,12 +5,24 @@ declare(strict_types=1);
 namespace IPTools;
 
 use InvalidArgumentException;
+use IPTools\Enums\IPType;
+use IPTools\Enums\IPVersion;
+use IPTools\Enums\OverflowMode;
 use IPTools\Exception\IpException;
 use OverflowException;
 use Stringable;
 use Throwable;
 
 /**
+ * Immutable value object representing a single IPv4 or IPv6 address.
+ *
+ * Internally stores the address as a packed binary string (PHP's inet_pton format):
+ * 4 bytes for IPv4, 16 bytes for IPv6. This binary form enables fast byte-level
+ * comparisons and bitwise operations without string parsing.
+ *
+ * All arithmetic methods (next, previous, addOffset, shift) return new IP instances —
+ * the original is never mutated.
+ *
  * @author Safarov Alisher <alisher.safarov@outlook.com>
  *
  * @link https://github.com/S1lentium/IPTools
@@ -19,22 +31,39 @@ class IP implements Stringable
 {
     use PropertyTrait;
 
+    /** @deprecated Use IPVersion::IPv4 instead. */
     public const IP_V4 = 'IPv4';
 
+    /** @deprecated Use IPVersion::IPv6 instead. */
     public const IP_V6 = 'IPv6';
 
+    /** @deprecated Use IPVersion::IPv4->maxPrefixLength() instead. */
     public const IP_V4_MAX_PREFIX_LENGTH = 32;
 
+    /** @deprecated Use IPVersion::IPv6->maxPrefixLength() instead. */
     public const IP_V6_MAX_PREFIX_LENGTH = 128;
 
+    /** @deprecated Use IPVersion::IPv4->octets() instead. */
     public const IP_V4_OCTETS = 4;
 
+    /** @deprecated Use IPVersion::IPv6->octets() instead. */
     public const IP_V6_OCTETS = 16;
 
+    /**
+     * @var numeric-string
+     *
+     * @deprecated Use IPVersion::IPv4->maxLong() instead.
+     */
     public const IP_V4_MAX_LONG = '4294967295';
 
+    /**
+     * @var numeric-string
+     *
+     * @deprecated Use IPVersion::IPv6->maxLong() instead.
+     */
     public const IP_V6_MAX_LONG = '340282366920938463463374607431768211455';
 
+    /** Packed binary from inet_pton: 4 bytes (IPv4) or 16 bytes (IPv6). */
     private string $in_addr;
 
     /**
@@ -54,6 +83,11 @@ class IP implements Stringable
         return (string) inet_ntop($this->in_addr);
     }
 
+    /**
+     * Smart factory: detect format and dispatch to the appropriate parser.
+     *
+     * Resolution order: 0x → hex, 0b → binary, numeric → long, otherwise → inet_pton.
+     */
     public static function parse(int|string $ip): self
     {
         if (is_string($ip)) {
@@ -117,30 +151,35 @@ class IP implements Stringable
     }
 
     /**
+     * Construct from a decimal integer (long) representation.
+     *
+     * Uses bcmath throughout because IPv6 values can reach 2^128,
+     * far exceeding PHP_INT_MAX. The decimal is converted to a packed
+     * binary string by repeated division by 256 (one byte per iteration).
+     *
      * @throws IpException
      */
-    public static function parseLong(int|string $longIP, string $version = self::IP_V4): self
+    public static function parseLong(int|string $longIP, IPVersion|string $version = IPVersion::IPv4): self
     {
-        if (! in_array($version, [self::IP_V4, self::IP_V6], true)) {
-            throw new IpException('Wrong IP version');
-        }
-
+        $version = IPVersion::resolve($version);
         $longIP = (string) $longIP;
         if (! preg_match('/^-?\d+$/', $longIP)) {
             throw new IpException('Invalid long IP address format');
         }
         /** @var numeric-string $longIP */
-        $max = $version === self::IP_V4 ? self::IP_V4_MAX_LONG : self::IP_V6_MAX_LONG;
+        $max = $version->maxLong();
         if (bccomp($longIP, '0') < 0 || bccomp($longIP, $max) > 0) {
             throw new IpException('Long IP address is out of range');
         }
 
+        // Convert decimal → byte array by extracting one octet at a time (LSB first)
         $binary = [];
-        $octets = $version === self::IP_V4 ? self::IP_V4_OCTETS : self::IP_V6_OCTETS;
+        $octets = $version->octets();
         for ($i = 0; $i < $octets; $i++) {
             $binary[] = (int) bcmod($longIP, '256');
             $longIP = bcdiv($longIP, '256', 0);
         }
+        // Reverse to network byte order (MSB first) and pack into binary string
         $packed = pack('C*', ...array_reverse($binary));
         $ip = inet_ntop($packed);
         if ($ip === false) {
@@ -161,11 +200,15 @@ class IP implements Stringable
     }
 
     /**
+     * Embed an IPv4 address in IPv6 as ::ffff:x.x.x.x (RFC 4291 §2.5.5.2).
+     *
+     * Used by dual-stack systems to represent IPv4 clients within IPv6 sockets.
+     *
      * @throws InvalidArgumentException
      */
     public static function toIpv4Mapped(self $ipv4): self
     {
-        if ($ipv4->getVersion() !== self::IP_V4) {
+        if ($ipv4->getVersion() !== IPVersion::IPv4) {
             throw new InvalidArgumentException('Expected an IPv4 address');
         }
 
@@ -173,24 +216,28 @@ class IP implements Stringable
     }
 
     /**
+     * Extract the IPv4 address from an IPv4-mapped IPv6 address (::ffff:x.x.x.x).
+     *
      * @throws InvalidArgumentException
      */
     public static function fromIpv4Mapped(self|string $ipv6): self
     {
         $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
-        if ($ip->getVersion() !== self::IP_V6 || ! $ip->isIpv4Mapped()) {
+        if ($ip->getVersion() !== IPVersion::IPv6 || ! $ip->isIpv4Mapped()) {
             throw new InvalidArgumentException('Address is not an IPv4-mapped IPv6 address');
         }
 
-        return self::parseInAddr(substr($ip->inAddr(), 12, self::IP_V4_OCTETS));
+        return self::parseInAddr(substr($ip->inAddr(), 12, IPVersion::IPv4->octets()));
     }
 
     /**
+     * Create a 6to4 IPv6 address (2002:x.x.x.x::) from an IPv4 address (RFC 3056).
+     *
      * @throws InvalidArgumentException
      */
     public static function to6to4(self $ipv4): self
     {
-        if ($ipv4->getVersion() !== self::IP_V4) {
+        if ($ipv4->getVersion() !== IPVersion::IPv4) {
             throw new InvalidArgumentException('Expected an IPv4 address');
         }
 
@@ -198,24 +245,30 @@ class IP implements Stringable
     }
 
     /**
+     * Extract the embedded IPv4 address from a 6to4 IPv6 address (RFC 3056).
+     *
      * @throws InvalidArgumentException
      */
     public static function from6to4(self|string $ipv6): self
     {
         $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
-        if ($ip->getVersion() !== self::IP_V6 || ! $ip->is6to4()) {
+        if ($ip->getVersion() !== IPVersion::IPv6 || ! $ip->is6to4()) {
             throw new InvalidArgumentException('Address is not a 6to4 IPv6 address');
         }
 
-        return self::parseInAddr(substr($ip->inAddr(), 2, self::IP_V4_OCTETS));
+        return self::parseInAddr(substr($ip->inAddr(), 2, IPVersion::IPv4->octets()));
     }
 
     /**
+     * Create a NAT64 IPv6 address by embedding IPv4 in the last 32 bits of a /96 prefix (RFC 6052).
+     *
+     * Default prefix is the well-known 64:ff9b::/96.
+     *
      * @throws InvalidArgumentException
      */
     public static function toNat64(self $ipv4, string $prefix = '64:ff9b::/96'): self
     {
-        if ($ipv4->getVersion() !== self::IP_V4) {
+        if ($ipv4->getVersion() !== IPVersion::IPv4) {
             throw new InvalidArgumentException('Expected an IPv4 address');
         }
 
@@ -225,49 +278,47 @@ class IP implements Stringable
     }
 
     /**
+     * Extract the IPv4 address from a NAT64 IPv6 address (RFC 6052).
+     *
      * @throws InvalidArgumentException
      */
     public static function fromNat64(self|string $ipv6, string $prefix = '64:ff9b::/96'): self
     {
         $ip = is_string($ipv6) ? self::parse($ipv6) : $ipv6;
-        if ($ip->getVersion() !== self::IP_V6) {
+        if ($ip->getVersion() !== IPVersion::IPv6) {
             throw new InvalidArgumentException('Expected an IPv6 address');
         }
 
         $network = self::parseNat64Prefix($prefix);
-        if (! self::ipInNetwork($ip, $network)) {
+        if (! $network->containsIP($ip)) {
             throw new InvalidArgumentException('Address is not within the NAT64 prefix');
         }
 
-        return self::parseInAddr(substr($ip->inAddr(), 12, self::IP_V4_OCTETS));
+        return self::parseInAddr(substr($ip->inAddr(), 12, IPVersion::IPv4->octets()));
     }
 
-    public function getVersion(): string
+    public function getVersion(): IPVersion
     {
         return match (strlen($this->in_addr)) {
-            self::IP_V4_OCTETS => self::IP_V4,
-            self::IP_V6_OCTETS => self::IP_V6,
+            4 => IPVersion::IPv4,
+            16 => IPVersion::IPv6,
             default => throw new IpException('Unable to determine IP version'),
         };
     }
 
     public function getMaxPrefixLength(): int
     {
-        return $this->getVersion() === self::IP_V4
-            ? self::IP_V4_MAX_PREFIX_LENGTH
-            : self::IP_V6_MAX_PREFIX_LENGTH;
+        return $this->getVersion()->maxPrefixLength();
     }
 
     public function getOctetsCount(): int
     {
-        return $this->getVersion() === self::IP_V4
-            ? self::IP_V4_OCTETS
-            : self::IP_V6_OCTETS;
+        return $this->getVersion()->octets();
     }
 
     public function getReversePointer(): string
     {
-        if ($this->getVersion() === self::IP_V4) {
+        if ($this->getVersion() === IPVersion::IPv4) {
             $reverseOctets = array_reverse(explode('.', $this->__toString()));
 
             return implode('.', $reverseOctets).'.in-addr.arpa';
@@ -282,6 +333,10 @@ class IP implements Stringable
         return implode('.', $reverseOctets).'.ip6.arpa';
     }
 
+    /**
+     * Raw packed binary (inet_pton format). Used internally for byte-level
+     * comparisons; prefer __toString() for display.
+     */
     public function inAddr(): string
     {
         return $this->in_addr;
@@ -309,7 +364,7 @@ class IP implements Stringable
 
     public function expanded(): string
     {
-        if ($this->getVersion() === self::IP_V4) {
+        if ($this->getVersion() === IPVersion::IPv4) {
             return (string) $this;
         }
 
@@ -317,11 +372,17 @@ class IP implements Stringable
     }
 
     /**
+     * Decimal string representation of the address.
+     *
+     * Returns a numeric string rather than int because IPv6 values exceed
+     * PHP_INT_MAX. IPv4 uses native ip2long(); IPv6 uses bcmath to
+     * reconstruct the value from its 16 bytes (MSB-first positional expansion).
+     *
      * @return numeric-string
      */
     public function toLong(): string
     {
-        if ($this->getVersion() === self::IP_V4) {
+        if ($this->getVersion() === IPVersion::IPv4) {
             $ip = inet_ntop($this->in_addr);
             if ($ip === false) {
                 throw new IpException('Unable to unpack IP address');
@@ -331,11 +392,13 @@ class IP implements Stringable
                 throw new IpException('Unable to convert IP address');
             }
 
+            // %u ensures unsigned — ip2long returns signed on 32-bit systems
             return sprintf('%u', $longValue);
         }
 
+        // IPv6: each byte contributes byte_value × 256^position (big-endian)
         $long = '0';
-        $octet = self::IP_V6_OCTETS - 1;
+        $octet = IPVersion::IPv6->octets() - 1;
         $chars = unpack('C*', $this->in_addr);
         if ($chars === false) {
             throw new IpException('Unable to unpack IP address');
@@ -413,7 +476,7 @@ class IP implements Stringable
 
     public function isIpv4Mapped(): bool
     {
-        if ($this->getVersion() !== self::IP_V6) {
+        if ($this->getVersion() !== IPVersion::IPv6) {
             return false;
         }
 
@@ -422,7 +485,7 @@ class IP implements Stringable
 
     public function is6to4(): bool
     {
-        if ($this->getVersion() !== self::IP_V6) {
+        if ($this->getVersion() !== IPVersion::IPv6) {
             return false;
         }
 
@@ -434,13 +497,13 @@ class IP implements Stringable
      */
     public function isNat64(string $prefix = '64:ff9b::/96'): bool
     {
-        if ($this->getVersion() !== self::IP_V6) {
+        if ($this->getVersion() !== IPVersion::IPv6) {
             return false;
         }
 
         $network = self::parseNat64Prefix($prefix);
 
-        return self::ipInNetwork($this, $network);
+        return $network->containsIP($this);
     }
 
     // -------------------------------------------------------------------------
@@ -459,6 +522,7 @@ class IP implements Stringable
             throw new InvalidArgumentException('Cannot compare IPs of different versions');
         }
 
+        // strcmp returns variable positive/negative values; <=> 0 normalizes to -1/0/1
         return strcmp($this->in_addr, $other->in_addr) <=> 0;
     }
 
@@ -600,21 +664,11 @@ class IP implements Stringable
             throw new InvalidArgumentException('Invalid NAT64 prefix', 0, $throwable);
         }
 
-        if ($network->getIP()->getVersion() !== self::IP_V6 || $network->getPrefixLength() !== 96) {
+        if ($network->getIP()->getVersion() !== IPVersion::IPv6 || $network->getPrefixLength() !== 96) {
             throw new InvalidArgumentException('NAT64 prefix must be an IPv6 /96 network');
         }
 
         return $network;
-    }
-
-    private static function ipInNetwork(self $ip, Network $network): bool
-    {
-        if ($ip->getVersion() !== $network->getIP()->getVersion()) {
-            return false;
-        }
-
-        return strcmp($ip->inAddr(), $network->getFirstIP()->inAddr()) >= 0
-            && strcmp($ip->inAddr(), $network->getLastIP()->inAddr()) <= 0;
     }
 
     // -------------------------------------------------------------------------
@@ -626,13 +680,15 @@ class IP implements Stringable
      */
     private function maxLong(): string
     {
-        return $this->getVersion() === self::IP_V4
-            ? self::IP_V4_MAX_LONG
-            : self::IP_V6_MAX_LONG;
+        return $this->getVersion()->maxLong();
     }
 
     /**
      * Wrap a value into [0, max] using modulo arithmetic.
+     *
+     * PHP's bcmod preserves the sign of the dividend (unlike mathematical modulo),
+     * so for negative inputs we add the modulus to bring the result back into [0, max].
+     * Example: -1 mod 4294967296 = -1 in PHP → corrected to 4294967295.
      *
      * @param  numeric-string  $value
      * @param  numeric-string  $max
@@ -644,7 +700,6 @@ class IP implements Stringable
         /** @var numeric-string $result */
         $result = bcmod($value, $modulus);
 
-        // bcmod can return negative values in PHP for negative inputs
         if (bccomp($result, '0') < 0) {
             return bcadd($result, $modulus);
         }

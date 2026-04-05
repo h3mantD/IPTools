@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use IPTools\Enums\IPVersion;
 use IPTools\IP;
 use IPTools\Network;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,20 +23,20 @@ final class NetworkTest extends TestCase
     public static function getPrefixData(): array
     {
         return [
-            ['24', IP::IP_V4, IP::parse('255.255.255.0')],
-            ['32', IP::IP_V4, IP::parse('255.255.255.255')],
-            ['64', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff::')],
-            ['128', IP::IP_V6, IP::parse('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')],
+            ['24', IPVersion::IPv4, IP::parse('255.255.255.0')],
+            ['32', IPVersion::IPv4, IP::parse('255.255.255.255')],
+            ['64', IPVersion::IPv6, IP::parse('ffff:ffff:ffff:ffff::')],
+            ['128', IPVersion::IPv6, IP::parse('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')],
         ];
     }
 
     public static function getInvalidPrefixData(): array
     {
         return [
-            ['-1', IP::IP_V4],
-            ['33', IP::IP_V4],
-            ['-1', IP::IP_V6],
-            ['129', IP::IP_V6],
+            ['-1', IPVersion::IPv4],
+            ['33', IPVersion::IPv4],
+            ['-1', IPVersion::IPv6],
+            ['129', IPVersion::IPv6],
         ];
     }
 
@@ -254,21 +255,20 @@ final class NetworkTest extends TestCase
     }
 
     #[DataProvider('getPrefixData')]
-    public function test_prefix2_mask(string $prefix, string $version, IP $mask): void
+    public function test_prefix2_mask(string $prefix, IPVersion|string $version, IP $mask): void
     {
         $this->assertEquals($mask, Network::prefix2netmask($prefix, $version));
     }
 
     public function test_prefix2_mask_wrong_ip_version(): void
     {
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Wrong IP version');
+        $this->expectException(ValueError::class);
 
         Network::prefix2netmask('128', 'ip_version');
     }
 
     #[DataProvider('getInvalidPrefixData')]
-    public function test_prefix2_mask_invalid_prefix(string $prefix, string $version): void
+    public function test_prefix2_mask_invalid_prefix(string $prefix, IPVersion|string $version): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Invalid prefix length');
@@ -434,5 +434,224 @@ final class NetworkTest extends TestCase
 
         $this->assertNull(Network::parse('0.0.0.0/0')->previousSubnet());
         $this->assertNull(Network::parse('255.255.255.0/24')->nextSubnet());
+    }
+
+    // -------------------------------------------------------------------------
+    // /0 networks — entire address space
+    // -------------------------------------------------------------------------
+
+    public function test_slash_zero_ipv4_block_size(): void
+    {
+        $network = Network::parse('0.0.0.0/0');
+
+        $this->assertSame(4294967296, $network->getBlockSize());
+        $this->assertSame('0.0.0.0', (string) $network->getFirstIP());
+        $this->assertSame('255.255.255.255', (string) $network->getLastIP());
+    }
+
+    public function test_slash_zero_ipv6_block_size(): void
+    {
+        $network = Network::parse('::/0');
+
+        $this->assertSame(
+            '340282366920938463463374607431768211456',
+            (string) $network->getBlockSize()
+        );
+        $this->assertSame('::', (string) $network->getFirstIP());
+        $this->assertSame('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', (string) $network->getLastIP());
+    }
+
+    public function test_slash_zero_ipv4_usable_host_count(): void
+    {
+        $network = Network::parse('0.0.0.0/0');
+
+        // /0 has prefix < 31, so usable = blockSize - 2
+        $this->assertSame(4294967294, $network->usableHostCount());
+    }
+
+    public function test_slash_zero_ipv4_next_subnet_null(): void
+    {
+        $this->assertNull(Network::parse('0.0.0.0/0')->nextSubnet());
+    }
+
+    public function test_slash_zero_ipv6_next_subnet_null(): void
+    {
+        $this->assertNull(Network::parse('::/0')->nextSubnet());
+    }
+
+    public function test_slash_zero_exclude(): void
+    {
+        $networks = Network::parse('0.0.0.0/0')->exclude('128.0.0.0/1');
+
+        $this->assertCount(1, $networks);
+        $this->assertSame('0.0.0.0/1', (string) $networks[0]);
+    }
+
+    // -------------------------------------------------------------------------
+    // /32 and /128 single-host networks
+    // -------------------------------------------------------------------------
+
+    public function test_slash_32_iteration(): void
+    {
+        $network = Network::parse('10.0.0.1/32');
+        $collected = [];
+        foreach ($network as $ip) {
+            $collected[] = (string) $ip;
+        }
+
+        $this->assertSame(['10.0.0.1'], $collected);
+        $this->assertCount(1, $network);
+    }
+
+    public function test_slash_128_iteration(): void
+    {
+        $network = Network::parse('2001:db8::1/128');
+        $collected = [];
+        foreach ($network as $ip) {
+            $collected[] = (string) $ip;
+        }
+
+        $this->assertSame(['2001:db8::1'], $collected);
+        $this->assertCount(1, $network);
+    }
+
+    public function test_slash_32_get_hosts_returns_single_ip(): void
+    {
+        $network = Network::parse('10.0.0.1/32');
+        $hosts = $network->getHosts();
+
+        $this->assertSame('10.0.0.1', (string) $hosts->getFirstIP());
+        $this->assertSame('10.0.0.1', (string) $hosts->getLastIP());
+        $this->assertCount(1, $hosts);
+    }
+
+    public function test_slash_32_exclude_self_returns_empty(): void
+    {
+        $networks = Network::parse('10.0.0.1/32')->exclude('10.0.0.1/32');
+
+        $this->assertCount(0, $networks);
+    }
+
+    // -------------------------------------------------------------------------
+    // /31 and /127 point-to-point networks
+    // -------------------------------------------------------------------------
+
+    public function test_slash_31_get_hosts(): void
+    {
+        $network = Network::parse('192.0.2.0/31');
+        $hosts = $network->getHosts();
+
+        // /31 is point-to-point: both addresses are usable
+        $this->assertSame('192.0.2.0', (string) $hosts->getFirstIP());
+        $this->assertSame('192.0.2.1', (string) $hosts->getLastIP());
+        $this->assertCount(2, $hosts);
+    }
+
+    public function test_slash_127_is_point_to_point(): void
+    {
+        $network = Network::parse('2001:db8::/127');
+        $this->assertTrue($network->isPointToPoint());
+        $this->assertSame('2', (string) $network->usableHostCount());
+    }
+
+    // -------------------------------------------------------------------------
+    // netmask2prefix — direct test
+    // -------------------------------------------------------------------------
+
+    public function test_netmask2prefix(): void
+    {
+        $this->assertSame(24, Network::netmask2prefix(new IP('255.255.255.0')));
+        $this->assertSame(32, Network::netmask2prefix(new IP('255.255.255.255')));
+        $this->assertSame(0, Network::netmask2prefix(new IP('0.0.0.0')));
+        $this->assertSame(64, Network::netmask2prefix(new IP('ffff:ffff:ffff:ffff::')));
+        $this->assertSame(128, Network::netmask2prefix(new IP('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')));
+    }
+
+    // -------------------------------------------------------------------------
+    // getBlockSize — direct assertions
+    // -------------------------------------------------------------------------
+
+    public function test_get_block_size_ipv4(): void
+    {
+        $this->assertSame(256, Network::parse('10.0.0.0/24')->getBlockSize());
+        $this->assertSame(1, Network::parse('10.0.0.1/32')->getBlockSize());
+        $this->assertSame(2, Network::parse('10.0.0.0/31')->getBlockSize());
+    }
+
+    public function test_get_block_size_ipv6(): void
+    {
+        $this->assertSame('1', (string) Network::parse('2001:db8::1/128')->getBlockSize());
+        $this->assertSame(
+            '18446744073709551616',
+            (string) Network::parse('2001:db8::/64')->getBlockSize()
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // moveTo — IPv6
+    // -------------------------------------------------------------------------
+
+    public function test_move_to_ipv6(): void
+    {
+        $result = [];
+        foreach (Network::parse('2001:db8::/126')->moveTo('128') as $network) {
+            $result[] = (string) $network;
+        }
+
+        $this->assertSame([
+            '2001:db8::/128',
+            '2001:db8::1/128',
+            '2001:db8::2/128',
+            '2001:db8::3/128',
+        ], $result);
+    }
+
+    public function test_move_to_ipv6_halving(): void
+    {
+        $result = [];
+        foreach (Network::parse('2001:db8::/64')->moveTo('65') as $network) {
+            $result[] = (string) $network;
+        }
+
+        $this->assertCount(2, $result);
+        $this->assertSame('2001:db8::/65', $result[0]);
+        $this->assertSame('2001:db8:0:0:8000::/65', $result[1]);
+    }
+
+    // -------------------------------------------------------------------------
+    // summarize — edge cases
+    // -------------------------------------------------------------------------
+
+    public function test_summarize_empty_input(): void
+    {
+        $this->assertSame([], Network::summarize([]));
+    }
+
+    public function test_summarize_single_network(): void
+    {
+        $result = Network::summarize(['10.0.0.0/24']);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('10.0.0.0/24', (string) $result[0]);
+    }
+
+    public function test_summarize_duplicate_networks(): void
+    {
+        $result = Network::summarize(['10.0.0.0/24', '10.0.0.0/24']);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('10.0.0.0/24', (string) $result[0]);
+    }
+
+    public function test_summarize_non_adjacent(): void
+    {
+        $result = [];
+        foreach (Network::summarize(['10.0.0.0/24', '10.0.2.0/24']) as $network) {
+            $result[] = (string) $network;
+        }
+
+        $this->assertCount(2, $result);
+        $this->assertSame('10.0.0.0/24', $result[0]);
+        $this->assertSame('10.0.2.0/24', $result[1]);
     }
 }

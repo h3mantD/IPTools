@@ -12,6 +12,12 @@ use Iterator;
 use OutOfBoundsException;
 
 /**
+ * Inclusive IP interval from a first address to a last address.
+ *
+ * Supports iteration over every address in the range, decomposition into
+ * minimal CIDR networks, offset-based addressing (including negative offsets
+ * from the end), and containment checks.
+ *
  * @author Safarov Alisher <alisher.safarov@outlook.com>
  *
  * @link https://github.com/S1lentium/IPTools
@@ -20,15 +26,12 @@ use OutOfBoundsException;
  */
 class Range implements Countable, Iterator
 {
+    use IPIteratorTrait;
     use PropertyTrait;
 
     private ?IP $firstIP = null;
 
     private ?IP $lastIP = null;
-
-    private int $position = 0;
-
-    private ?IP $currentIP = null;
 
     /**
      * @throws RangeException
@@ -39,6 +42,12 @@ class Range implements Countable, Iterator
         $this->setLastIP($lastIP);
     }
 
+    /**
+     * Parse from CIDR, wildcard, dash-separated, or single IP notation.
+     *
+     * Dispatch: CIDR/netmask → Network, wildcard → 0/255 substitution,
+     * dash → explicit endpoints, bare IP → single-address range.
+     */
     public static function parse(string $data): self
     {
         if (str_contains($data, '/') || str_contains($data, ' ')) {
@@ -53,6 +62,7 @@ class Range implements Countable, Iterator
             $firstIP = IP::parse($first);
             $lastIP = IP::parse($last);
         } else {
+            // Single IP → range of one address
             $firstIP = IP::parse($data);
             $lastIP = clone $firstIP;
         }
@@ -132,6 +142,11 @@ class Range implements Countable, Iterator
     }
 
     /**
+     * Decompose this range into the minimum set of CIDR networks (lazy).
+     *
+     * Greedy algorithm: at each position, pick the largest network that
+     * fits within the remaining range, then advance past it.
+     *
      * @return Generator<int, Network>
      */
     public function iterateNetworks(): Generator
@@ -187,12 +202,20 @@ class Range implements Countable, Iterator
         return null;
     }
 
+    /**
+     * Smallest single CIDR network that fully contains this range.
+     *
+     * XOR the first and last addresses: matching leading bits (zeros in XOR)
+     * are the common prefix; the prefix length is the count of those leading zeros.
+     * The network address is the first IP's bits up to that prefix, zero-padded.
+     */
     public function getSpanNetwork(): Network
     {
         $firstIP = $this->getFirstIP();
         $lastIP = $this->getLastIP();
         $xorIP = IP::parseInAddr($firstIP->inAddr() ^ $lastIP->inAddr());
 
+        // Count leading zeros in the XOR → number of shared prefix bits
         preg_match('/^(0*)/', $xorIP->toBin(), $match);
 
         $prefixLength = strlen($match[1]);
@@ -256,50 +279,6 @@ class Range implements Countable, Iterator
         return $ip;
     }
 
-    public function current(): IP
-    {
-        if (! $this->currentIP instanceof IP) {
-            $ip = $this->getFirstIP()->next($this->position);
-            if (! $ip instanceof IP) {
-                throw new RangeException('Iterator position is out of range');
-            }
-
-            $this->currentIP = $ip;
-        }
-
-        return $this->currentIP;
-    }
-
-    public function key(): int
-    {
-        return $this->position;
-    }
-
-    public function next(): void
-    {
-        $this->position++;
-
-        if ($this->currentIP instanceof IP) {
-            $this->currentIP = $this->currentIP->next(); // ?IP; null signals boundary
-        }
-    }
-
-    public function rewind(): void
-    {
-        $this->position = 0;
-        $this->currentIP = null;
-    }
-
-    public function valid(): bool
-    {
-        // next() set currentIP to null when the address-space boundary was reached
-        if (! $this->currentIP instanceof IP && $this->position > 0) {
-            return false;
-        }
-
-        return strcmp($this->current()->inAddr(), $this->getLastIP()->inAddr()) <= 0;
-    }
-
     /**
      * @return numeric-string
      */
@@ -323,12 +302,23 @@ class Range implements Countable, Iterator
         return max(0, (int) $count);
     }
 
+    /**
+     * Find the largest valid CIDR network starting at $firstIP that fits within [$firstIP, $lastIP].
+     *
+     * A valid CIDR block at a given address requires that address's trailing
+     * zeros can accommodate the host bits. For example, 10.0.0.8 (binary ...1000)
+     * has 3 trailing zeros, so the largest block is /29 (3 host bits).
+     *
+     * We try the maximum host bits (trailing zeros) first and shrink until the
+     * resulting broadcast doesn't exceed $lastIP.
+     */
     private function getLargestNetworkFrom(IP $firstIP, IP $lastIP): Network
     {
         $maxPrefixLength = $firstIP->getMaxPrefixLength();
         $firstBinary = $firstIP->toBin();
         $lastBinary = $lastIP->toBin();
 
+        // Count trailing zeros in firstIP — they limit how large a CIDR block can start here
         $trailingZeros = 0;
         for ($position = $maxPrefixLength - 1; $position >= 0; $position--) {
             if ($firstBinary[$position] !== '0') {
@@ -338,6 +328,7 @@ class Range implements Countable, Iterator
             $trailingZeros++;
         }
 
+        // Try the largest candidate (most host bits) first; shrink until it fits within lastIP
         $hostBits = 0;
         for ($candidateHostBits = $trailingZeros; $candidateHostBits >= 0; $candidateHostBits--) {
             $prefixLength = $maxPrefixLength - $candidateHostBits;
