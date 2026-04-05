@@ -1,63 +1,62 @@
 # IPTools Documentation
 
-Welcome to the IPTools docs. This section explains concepts first, then APIs, then integration patterns.
+IPTools is a PHP library for working with IPv4 and IPv6 addresses, networks, and ranges. Whether you're building firewall rules, validating user input, planning subnets, or storing IP ranges in a database — this library has you covered.
 
-If you prefer to jump straight to method signatures, start with [API Reference](api-reference.md).
+```php
+use IPTools\IP;
+use IPTools\Network;
 
-## Documentation Map
+$ip = new IP('192.168.1.1');
 
-- [IP Guide](ip.md)
-  - Parse and format addresses
-  - Address type classification
-  - Address arithmetic and overflow behavior
-  - IPv4/IPv6 transition helpers
-- [Parser Guide](parser.md)
-  - Flexible parser entry points
-  - Parse flags and strict mode
-  - Ports, zone IDs, non-decimal inputs, and wildcards
-- [Network Guide](network.md)
-  - CIDR modeling and subnet math
-  - Host helpers and boundary behavior
-  - Exclusion, splitting, summarization, and iteration
-- [Range Guide](range.md)
-  - Inclusive interval modeling
-  - Range decomposition into minimal CIDRs
-  - Offset addressing and precise counts
-- [RangeSet Guide](rangeset.md)
-  - Canonical range normalization
-  - Set algebra (`union`, `intersect`, `subtract`)
-  - Overlap and containment queries
-- [Storage Guide](storage.md)
-  - Database-backed lookup model
-  - 16-byte address encoding strategy
-  - SQL schema and query usage
-- [Laravel Integration Guide](laravel.md)
-  - Service provider wiring
-  - Publishable config/migration/model assets
-  - Container and adapter usage
-- [API Reference](api-reference.md)
-  - Public classes and methods in one place
+if ($ip->isPrivate()) {
+    echo "{$ip} is a private address";
+}
+
+$network = Network::parse('10.0.0.0/24');
+
+if ($network->containsIP($ip)) {
+    echo "{$ip} is in the network";
+}
+```
+
+## Not Sure Where to Start?
+
+If you're new to IPTools, start with the **[Getting Started](getting-started.md)** guide. It walks you through installation and basic usage in under 5 minutes.
+
+If you know what you need, jump to the relevant guide below.
+
+If you're trying to decide between `IP`, `Network`, `Range`, or `RangeSet`, see the **[Comparison Guide](comparison.md)**.
+
+## Guides
+
+- **[Getting Started](getting-started.md)** — Install, parse your first IP, build a simple allow-list
+- **[IP Addresses](ip-addresses.md)** — Parse, convert, classify, and do arithmetic on individual addresses
+- **[Networks](networks.md)** — CIDR subnets, host boundaries, exclusion, splitting, and summarization
+- **[Ranges](ranges.md)** — Inclusive intervals, CIDR decomposition, indexed access
+- **[Range Sets](range-sets.md)** — Set algebra (union, intersect, subtract) on collections of ranges
+- **[Parsing](parsing.md)** — Flexible input parsing with ports, zone IDs, wildcards, and flags
+- **[Database Storage](database-storage.md)** — Persist and query IP ranges with SQL (MySQL, PostgreSQL, SQLite)
+- **[Laravel Integration](laravel.md)** — Service provider, migrations, container bindings
+- **[Comparison Guide](comparison.md)** — Which class should I use?
+- **[API Reference](api-reference.md)** — Every public method at a glance
 
 ## Suggested Learning Path
 
-1. [IP Guide](ip.md) to understand the core value object
-2. [Network Guide](network.md) and [Range Guide](range.md) for block/range operations
-3. [Parser Guide](parser.md) for input handling in real systems
-4. [RangeSet Guide](rangeset.md) for policy and set operations
-5. [Storage Guide](storage.md) for persistence and lookups
-6. [Laravel Integration Guide](laravel.md) if your app uses Laravel
-7. [API Reference](api-reference.md) as an ongoing lookup table
+1. **[Getting Started](getting-started.md)** — Get up and running
+2. **[IP Addresses](ip-addresses.md)** — Understand the core value object
+3. **[Networks](networks.md)** and **[Ranges](ranges.md)** — Work with blocks and intervals
+4. **[Parsing](parsing.md)** — Handle real-world user input
+5. **[Range Sets](range-sets.md)** — Build policy logic with set algebra
+6. **[Database Storage](database-storage.md)** — Persist ranges for lookups
+7. **[Laravel Integration](laravel.md)** — If your app uses Laravel
 
-## Conventions Used in These Docs
+## Conventions
 
-- `IP` means `IPTools\IP`
-- `Network` means `IPTools\Network`
-- `Range` means `IPTools\Range`
-- Numeric values that may exceed native integer size are returned as `numeric-string`
-- `count()` methods return `int` and may clamp at `PHP_INT_MAX`
+Throughout these docs:
 
-## Practical Notes
-
-- IPv4 and IPv6 are supported consistently across all core types.
-- Big-number arithmetic relies on `ext-bcmath`.
-- For large IPv6 spaces, favor lazy/decomposed operations over full address iteration.
+- `IP` refers to `IPTools\IP`
+- `Network` refers to `IPTools\Network`
+- `Range` refers to `IPTools\Range`
+- Code examples show output in comments: `// 192.168.1.0`
+- Methods returning large numbers use `numeric-string` (a string containing a decimal number) because IPv6 values can exceed `PHP_INT_MAX`
+- `count()` methods return `int` and may clamp at `PHP_INT_MAX` for very large IPv6 spaces — use `getCountPrecise()` when you need the exact value
